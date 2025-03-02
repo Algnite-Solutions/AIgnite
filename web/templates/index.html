@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Document Q&A</title>
+    <style>
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .upload-section, .chat-section { margin: 20px 0; }
+        #chat-history { height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="upload-section">
+            <h2>Upload Documents</h2>
+            <input type="file" id="file-upload" multiple>
+            <button onclick="uploadFiles()">Upload</button>
+        </div>
+
+        <div class="chat-section">
+            <h2>Ask Questions</h2>
+            <div id="chat-history"></div>
+            <input type="text" id="question" placeholder="Type your question...">
+            <button onclick="askQuestion()">Ask</button>
+        </div>
+    </div>
+
+    <script>
+        async function uploadFiles() {
+            const fileInput = document.getElementById('file-upload');
+            const formData = new FormData();
+            
+            for (const file of fileInput.files) {
+                formData.append('files', file);
+            }
+
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            alert('Files uploaded successfully!');
+        }
+
+        async function askQuestion() {
+            const question = document.getElementById('question').value;
+            const response = await fetch('/ask', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    question: question,
+                    context: ""  // Add context here if needed
+                })
+            });
+            
+            const result = await response.json();
+            
+            const chatHistory = document.getElementById('chat-history');
+            chatHistory.innerHTML = `
+                <p><strong>Q:</strong> ${question}</p>
+                <p><strong>A:</strong> ${result.answer}</p>
+            `;
+            
+            document.getElementById('question').value = '';
+        }
+    </script>
+</body>
+</html> 
