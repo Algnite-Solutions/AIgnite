@@ -1,6 +1,6 @@
-# vLLM FastAPI Service
+# AIgnite Service
 
-This project implements a REST API service using FastAPI and vLLM for efficient LLM inference.
+This project implements AIgnite with service with vLLM backend.
 
 ## Setup
 
