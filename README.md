@@ -1,20 +1,15 @@
 # AIgnite
 
-AIgnite provides 
+AIgnite provides Agent capabilities to multiple applications such as PaperIgnition.
 
 ---
 
 ## Dev Installation
 
-To set up the project for local development:
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/your-repo/aignite.git
-   cd aignite
-   ```
-
-python install -e 
+```
+pip install -r requirements.txt
+python install -e
+```
 
 
 ## Docker Installation
