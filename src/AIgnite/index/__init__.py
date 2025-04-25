@@ -1,2 +1,2 @@
 from .embedder import *
-from .indexer import *
+from .base_indexer import *
