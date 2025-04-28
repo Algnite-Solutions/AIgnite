@@ -18,4 +18,5 @@ We use docker to quicky deploy the package on cloud instances.
 ```
 docker build -t aignite:latest .
 docker run -it --rm aignite
+#docker run -it --rm -v ~/paperIgnite/AIgnite:/app aignite
 ```
