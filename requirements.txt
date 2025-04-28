@@ -1,1 +1,4 @@
 pydantic
+beautifulsoup4
+lxml
+arxiv
