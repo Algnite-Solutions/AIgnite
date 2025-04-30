@@ -1,6 +1,10 @@
 from typing import List, Optional
 from abc import ABC, abstractmethod
+<<<<<<< HEAD
+from AIgnite.data.docset import DocSet
+=======
 from ..docset import DocSet
+>>>>>>> 452a018494be4206c748e6559afa232fd2bef792
 
 class BaseIndexer(ABC):
     @abstractmethod
