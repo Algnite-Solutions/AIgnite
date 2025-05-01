@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import sys
 import os
 from pathlib import Path
@@ -21,8 +20,8 @@ from llama_index.core.embeddings import BaseEmbedding
 from pydantic import Field
 
 from llama_index.core import StorageContext
-from AIgnite.index.base_indexer import BaseIndexer
-from AIgnite.data.docset import DocSet
+from .base_indexer import BaseIndexer
+from ..data.docset import DocSet
 
 
 class BGEEmbedding(BaseEmbedding):
@@ -198,11 +197,3 @@ if __name__ == "__main__":
             except Exception:
                 pass
             indexer.embedding_model.model = None
-=======
-from .base_indexer import BaseIndexer
-
-
-class PaperIndexer(BaseIndexer):
-    # TODO: @Fang, implement paper indexer
-    pass
->>>>>>> 452a018494be4206c748e6559afa232fd2bef792

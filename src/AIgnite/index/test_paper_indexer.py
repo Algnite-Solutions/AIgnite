@@ -12,8 +12,8 @@ os.environ['OPENAI_API_KEY'] = ""  # Replace with your actual API key
 # Add the src directory to Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from AIgnite.data.docset import DocSet, Chunk, TextChunk, FigureChunk, TableChunk, ChunkType
-from AIgnite.index.paper_indexer import PaperIndexer
+from ..data.docset import DocSet, Chunk, TextChunk, FigureChunk, TableChunk, ChunkType
+from .paper_indexer import PaperIndexer
 
 
 def create_sample_papers() -> List[DocSet]:
