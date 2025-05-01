@@ -2,12 +2,15 @@ import unittest
 from pathlib import Path
 from AIgnite.data.docparser import ArxivHTMLExtractor
 from bs4 import BeautifulSoup
+#new
+from concurrent.futures import ProcessPoolExecutor, as_completed  
+from pathlib import Path
 
 class TestArxivHTMLExtractor(unittest.TestCase):
 
     def setUp(self):
         self.extractor = ArxivHTMLExtractor()
-        self.sample_html = self.extractor.load_html("/app/test/html_doc/test.txt")#Please change it to your path here
+        self.sample_html = self.extractor.load_html("/app/test/html_doc/test.txt")#Please change it to your path here and uncomment in the __main__
 
     def test_extract_docset(self):
         self.extractor.extract_docset(self.sample_html)
@@ -28,5 +31,42 @@ class TestArxivHTMLExtractor(unittest.TestCase):
     def tearDown(self):
         self.extractor = None
 
+def process_single_html(local_file_path: Path, output_dir: Path):
+    extractor = ArxivHTMLExtractor()
+    html = extractor.load_html(local_file_path)
+    extractor.extract_docset(html, output_dir)
+    extractor.serialize_docs(output_dir)
+
+
+def batch_process_htmls(input_dir: str, output_dir: str, max_workers: int = 8):  
+    input_dir = Path(input_dir)  
+    #output_dir = Path(output_dir)  
+    html_files = list(input_dir.glob("*.txt"))  
+    print(html_files)
+
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:  
+        futures = [executor.submit(process_single_html, html_path, Path(output_dir)) for html_path in html_files]
+
+        for future in as_completed(futures):  
+            try:  
+                future.result()  
+            except Exception as e:  
+                print(f"[ERROR] {e}")  
+
 if __name__ == "__main__":
-    unittest.main()
+    #unittest.main()
+
+    a = ArxivHTMLExtractor()#无意义，为了调用函数
+    #首次启动的时候，uncomment下面的注释用来加载html
+    #a.download_html("https://ar5iv.labs.arxiv.org/html/2503.20376","/data3/peirongcan/paperIgnite/AIgnite/test/htmls")
+    #a.download_html("https://ar5iv.labs.arxiv.org/html/2503.20201","/data3/peirongcan/paperIgnite/AIgnite/test/htmls")
+    #a.download_html("https://ar5iv.labs.arxiv.org/html/2503.09516","/data3/peirongcan/paperIgnite/AIgnite/test/htmls")
+    #a.download_html("https://ar5iv.labs.arxiv.org/html/2502.18017","/data3/peirongcan/paperIgnite/AIgnite/test/htmls")
+    #a.download_html("your_test_url","/data3/peirongcan/paperIgnite/AIgnite/test/htmls")
+    #a.download_html("your_test_url","/data3/peirongcan/paperIgnite/AIgnite/test/htmls")
+    #a.download_html("your_test_url","/data3/peirongcan/paperIgnite/AIgnite/test/htmls")
+    #a.download_html("your_test_url","/data3/peirongcan/paperIgnite/AIgnite/test/htmls")
+
+    #下面二选一去uncomment，测试两个函数的效率
+    #process_single_html("https://ar5iv.labs.arxiv.org/html/1907.01989","/data3/peirongcan/paperIgnite/AIgnite/test/htmls","/data3/peirongcan/paperIgnite/AIgnite/test/tem")
+    #batch_process_htmls("/data3/peirongcan/paperIgnite/AIgnite/test/htmls","/data3/peirongcan/paperIgnite/AIgnite/test/tem")
