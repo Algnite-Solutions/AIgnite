@@ -13,6 +13,30 @@ class ArxivHTMLExtractor():
     def __init__(self):
         self.docs = []
 
+    def download_html(self, url: str, source: str) -> str:
+        assert url.startswith("https://ar5iv.labs.arxiv.org/html/"), f"URL {url} must begin with https://ar5iv.labs.arxiv.org/html/"
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            html_content = response.text
+
+            if not os.path.exists(source):
+                os.makedirs(source)
+
+            #Generate the file name. Here simply use the last part of the URL as the file name
+            file_name = os.path.join(source, url.split("/")[-1] + ".txt")
+
+            with open(file_name, 'w', encoding='utf-8') as file:
+                file.write(html_content)
+            print(f"The web page content has been successfully saved to {file_name}")
+
+        except requests.RequestException as e:
+            print(f"An error occurred in the request: {e}")
+        except Exception as e:
+            print(f"An error occurred in the request: {e}")
+        return file_name
+
+
     def load_html(self, source: str) -> str:
         with open(source, "r", encoding="utf-8") as f:
             return f.read()
@@ -66,7 +90,27 @@ class ArxivHTMLExtractor():
         except Exception as e:
             print(f"Error when extracting authors: {e}")
             return []
-        
+    
+    def extract_text(self, soup:BeautifulSoup):
+        try:
+            article = soup.find('article', class_='ltx_document ltx_authors_1line')
+            all_text = ""
+            if article:
+                sections = article.find_all('section')
+                for section in sections:
+                    # 移除figure标签及其内容
+                    for figure in section.find_all('figure'):
+                        figure.extract()
+                    section_text = section.get_text()
+                    section_text = section_text.replace('\n\n', '\n')
+                    all_text += section_text
+                all_text = all_text.strip()
+                return all_text
+            return None
+        except Exception as e:
+            print(f"Error when extracting text: {e}")
+            return None
+    
     def get_published_date(self, arxiv_id: str) -> str | None:
         "Import Arxiv to search online."
         try:
@@ -109,10 +153,10 @@ class ArxivHTMLExtractor():
             if img and caption:
                 tag = caption.find('span', class_='ltx_tag_figure')
                 figure_name = tag.text.strip().rstrip(':').strip()
-                figure_name = figure_name.replace(' ', '')  # 把所有空格去掉
+                figure_name = figure_name.replace(' ', '')  #Remove all the Spaces
 
                 img_src = img['src']
-                img_url = urljoin("https://ar5iv.labs.arxiv.org/", img_src)  # 获取完整的图片 URL
+                img_url = urljoin("https://ar5iv.labs.arxiv.org/", img_src)  #Get the complete image URL
                 img_data = requests.get(img_url).content
                 alt = img.get('alt', '')
                 caption_text = caption.get_text(strip=True)
@@ -122,7 +166,7 @@ class ArxivHTMLExtractor():
                     'img_src': img_url,
                     'alt': alt,
                     'caption': caption_text,
-                    'img_data': img_data #图片本身数据
+                    'img_data': img_data #raw data of img
                 })
         return figures
 
@@ -143,7 +187,7 @@ class ArxivHTMLExtractor():
                 alt = img.get('alt', '')
                 caption_text = caption.get_text(strip=True)
                 img_data = requests.get(img_url).content
-                img_filename = os.path.join(img_path, f'{figure_name}.png')  # The file name of the stored picture
+                img_filename = os.path.join(img_path, f'{figure_name}.png')  #The file name of the stored picture
 
                 #Make sure the image storage directory exists
                 os.makedirs(os.path.dirname(img_filename), exist_ok=True)
@@ -162,8 +206,40 @@ class ArxivHTMLExtractor():
                 })
 
         return figures
+    
+    def extract_tables_to_folder(self, soup, table_path):
+        tables = []
+        for table_fig in soup.find_all('figure', class_='ltx_table'):
+            table = table_fig.find('table')
+            caption = table_fig.find('figcaption')
+            table_id = table_fig.get('id', '')
 
-    def extract_docset(self, html: str) -> DocSet:
+            if table and caption:
+                tag = caption.find('span', class_='ltx_tag_table')
+                if tag:
+                    table_name = tag.text.strip().rstrip(':').strip()
+                    table_name = table_name.replace(' ', '')
+
+                    table_html = str(table)
+                    table_filename = os.path.join(table_path, f'{table_name}.html')
+
+                    os.makedirs(os.path.dirname(table_filename), exist_ok=True)
+
+                    with open(table_filename, 'w', encoding='utf - 8') as f:
+                        f.write(table_html)
+
+                    caption_text = caption.get_text(strip=True)
+
+                    tables.append({
+                        'name': table_name,
+                        'id': table_id,
+                        'table_html': table_html,
+                        'caption': caption_text,
+                        'local_table_path': table_filename,
+                    })
+        return tables
+
+    def extract_docset(self, html: str, img_path, table_path) -> DocSet:
         soup = BeautifulSoup(html, "html.parser")
 
         title = self.extract_title(soup)
@@ -178,12 +254,17 @@ class ArxivHTMLExtractor():
         #print(published_date)
         categories = self.get_categories(arxiv_id)
         #print(categories)
-        #imgs = self.extract_figures(soup)
-        #print(imgs)
+        tables = self.extract_tables_to_folder(soup,table_path = table_path)
+        #print(tables)
+        figures =self.extract_figures_to_folder(soup,img_path = img_path)
+        text = self.extract_text(soup)#这个一定要放最后
+        #print(text)
 
-        text_chunks = [TextChunk(id=str(uuid4()), type="text", text=abstract)]
+
+        text_chunks = [TextChunk(id=str(uuid4()), type="text", text=text)]
+        figure_chunks = []
+        table_chunks = []
         
-
         self.docs.append(DocSet(
             doc_id = arxiv_id,
             title = title,
@@ -202,6 +283,10 @@ class ArxivHTMLExtractor():
 
 if __name__ == "__main__":
     extractor = ArxivHTMLExtractor()
-    html = extractor.load_html("/app/test/html_doc/test.txt")
-    extractor.extract_docset(html)
-    
+    file_name = extractor.download_html("https://ar5iv.labs.arxiv.org/html/1907.01989","/data3/peirongcan/paperIgnite/AIgnite/test/tem")
+    html = extractor.load_html(file_name)
+    extractor.extract_docset(html,"/data3/peirongcan/paperIgnite/AIgnite/test/tem","/data3/peirongcan/paperIgnite/AIgnite/test/tem")
+
+    #file_name = extractor.download_html("","")
+    #html = extractor.load_html(file_name)
+    #extractor.extract_docset(html,"","")
