@@ -1,1 +1,11 @@
 pydantic
+llama-index>=0.10.0
+llama-index-vector-stores-faiss
+llama-index-embeddings-huggingface
+sentence-transformers
+openai
+beautifulsoup4
+numpy==1.24.3
+faiss-gpu==1.7.2
+torch
+FlagEmbedding
