@@ -7,6 +7,8 @@ import arxiv
 import os
 import requests
 from urllib.parse import urljoin
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import json
 
 class ArxivHTMLExtractor():
@@ -14,28 +16,38 @@ class ArxivHTMLExtractor():
     def __init__(self):
         self.docs = []
 
+
     def download_html(self, url: str, source: str) -> str:
+        #设置三次最大重试次数
+        max_retries = 3
         assert url.startswith("https://ar5iv.labs.arxiv.org/html/"), f"URL {url} must begin with https://ar5iv.labs.arxiv.org/html/"
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            html_content = response.text
+        retries = 0
+        while retries < max_retries:
+            try:
+                response = requests.get(url)
+                response.raise_for_status()
+                html_content = response.text
 
-            if not os.path.exists(source):
-                os.makedirs(source)
+                if not os.path.exists(source):
+                    os.makedirs(source)
 
-            #Generate the file name. Here simply use the last part of the URL as the file name
-            file_name = os.path.join(source, url.split("/")[-1] + ".txt")
+                # Generate the file name. Here simply use the last part of the URL as the file name
+                file_name = os.path.join(source, url.split("/")[-1] + ".html")
 
-            with open(file_name, 'w', encoding='utf-8') as file:
-                file.write(html_content)
-            print(f"The web page content has been successfully saved to {file_name}")
+                with open(file_name, 'w', encoding='utf-8') as file:
+                    file.write(html_content)
+                print(f"The web page content has been successfully saved to {file_name}")
+                return file_name
+            except requests.RequestException as e:
+                print(f"An error occurred in the request: {e}. Retrying...")
+                retries += 1
+            except Exception as e:
+                print(f"An unexpected error occurred: {e}. Retrying...")
+                retries += 1
 
-        except requests.RequestException as e:
-            print(f"An error occurred in the request: {e}")
-        except Exception as e:
-            print(f"An error occurred in the request: {e}")
-        return file_name
+        print("Max retries reached. Download failed.")
+        return None
+
 
     def load_html(self, source: str) -> str:
         with open(source, "r", encoding="utf-8") as f:
@@ -93,9 +105,9 @@ class ArxivHTMLExtractor():
     
     def extract_text(self, soup: BeautifulSoup):
         try:
-            article = soup.find('article', class_='ltx_document ltx_authors_1line')
+            article = soup.find('article')
             all_text = []
-            sections = article.find_all('section')
+            sections = article.find_all('section', class_ = ['ltx_section', 'ltx_appendix'])
             if sections:
                 for section in sections:
                     # 移除figure标签及其内容
@@ -103,14 +115,14 @@ class ArxivHTMLExtractor():
                         figure.extract()
                     section_text = section.get_text()
                     section_text = section_text.replace('\n\n', '\n')
-                    section_id = section.get('id', '')  # 获取section的id
+                    # 获取section的id
+                    section_id = section.get('id', '')  
                     title_elem = section.find('h2', class_='ltx_title ltx_title_section')
-                    title = title_elem.get_text(strip=True) if title_elem else ''  # 获取h2section标题
-                    subtitle_elem = section.find('h3', class_='ltx_title ltx_title_subsection')
-                    subtitle = subtitle_elem.get_text(strip=True) if subtitle_elem else ''# 获取h3section标题
-                    if title == '':
-                        title = subtitle
-                    caption = title  # 这里根据ar5iv的html结构，没有明显可作为caption的内容，先设为title
+                    # 获取h2section标题
+                    title = title_elem.get_text(strip=True) if title_elem else ''  
+
+                    # 这里根据ar5iv的html结构，没有明显可作为caption的内容，先设为title
+                    caption = title 
                     all_text.append(TextChunk(
                         id=section_id,
                         type=ChunkType.TEXT,
@@ -167,15 +179,23 @@ class ArxivHTMLExtractor():
             if img and caption:
                 tag = caption.find('span', class_='ltx_tag_figure')
                 figure_name = tag.text.strip().rstrip(':').strip()
-                figure_name = figure_name.replace(' ', '')  #Remove all the Spaces
+                 #Remove all the Spaces
+                figure_name = figure_name.replace(' ', '') 
+                if figure_name.endswith('.'):
+                    figure_name = figure_name[:-1]
+                if not figure_name.startswith("Figure"):
+                    figure_name = "Figure" + fig_id[4] + figure_name
                 figure_name = str(arxivid)+'_'+figure_name
 
+
                 img_src = img['src']
-                img_url = urljoin("https://ar5iv.labs.arxiv.org/", img_src)  #Get the complete image URL
+                #Get the complete image URL
+                img_url = urljoin("https://ar5iv.labs.arxiv.org/", img_src) 
                 alt = img.get('alt', '')
                 caption_text = caption.get_text(strip=True)
                 img_data = requests.get(img_url).content
-                img_filename = os.path.join(img_path, f'{figure_name}.png')  #The file name of the stored picture
+                #The file name of the stored picture
+                img_filename = os.path.join(img_path, f'{figure_name}.png')
 
                 #Make sure the image storage directory exists
                 os.makedirs(os.path.dirname(img_filename), exist_ok=True)
@@ -284,16 +304,3 @@ class ArxivHTMLExtractor():
                 doc_dict = doc.dict()
                 json_str = json.dumps(doc_dict, indent=4)
                 f.write(json_str)
-
-if __name__ == "__main__":#调用包时请忽略
-    extractor = ArxivHTMLExtractor()
-    file_name = extractor.download_html("https://ar5iv.labs.arxiv.org/html/1907.01989","/data3/peirongcan/paperIgnite/AIgnite/test/tem")
-    html = extractor.load_html(file_name)
-    extractor.extract_docset(html,"/data3/peirongcan/paperIgnite/AIgnite/test/tem")
-    
-    with open('/data3/peirongcan/paperIgnite/AIgnite/test/tem/docsdata.txt', 'w', encoding='utf-8') as f:
-        f.write(str(extractor.docs))
-
-    #file_name = extractor.download_html("","")
-    #html = extractor.load_html(file_name)
-    #extractor.extract_docset(html,"","")
