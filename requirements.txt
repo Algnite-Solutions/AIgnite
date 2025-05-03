@@ -2,3 +2,5 @@ pydantic
 beautifulsoup4
 lxml
 arxiv
+requests
+urllib3

@@ -12,13 +12,21 @@ from urllib3.util.retry import Retry
 import json
 
 class ArxivHTMLExtractor():
-    #TODO: @rongcan, finish this extracter and serialize into a json
+    """
+    A class used to extract information from arXiv HTML pages and serialize it into JSON files.
+    """
     def __init__(self):
+        self.client = arxiv.Client()
         self.docs = []
 
-
     def download_html(self, url: str, source: str) -> str:
-        #设置三次最大重试次数
+        """
+        Args:
+            url (str): The URL of the HTML page to download, must start with "https://ar5iv.labs.arxiv.org/html/".
+            source (str): The directory path to save the downloaded file.
+        Returns:
+            str: The path of the saved HTML file, or None if the download fails.
+        """
         max_retries = 3
         assert url.startswith("https://ar5iv.labs.arxiv.org/html/"), f"URL {url} must begin with https://ar5iv.labs.arxiv.org/html/"
         retries = 0
@@ -50,6 +58,12 @@ class ArxivHTMLExtractor():
 
 
     def load_html(self, source: str) -> str:
+        """
+        Args:
+            source (str): The path to the file containing the HTML content.
+        Returns:
+            str: The HTML content from the file.
+        """
         with open(source, "r", encoding="utf-8") as f:
             return f.read()
     
@@ -137,11 +151,10 @@ class ArxivHTMLExtractor():
             return None
     
     def get_published_date(self, arxiv_id: str):
-        "Import Arxiv to search online."
+        "Import Arxiv to search online for the published date of a paper."
         try:
-            client = arxiv.Client()
             search = arxiv.Search(id_list=[arxiv_id])
-            results = client.results(search)
+            results = self.client.results(search)
             paper = next(results, None)
             if paper is None:
                 print(f"Warning：paper with arXiv ID '{arxiv_id}' NOT FOUND")
@@ -154,11 +167,10 @@ class ArxivHTMLExtractor():
             return None
         
     def get_categories(self, arxiv_id: str):
-        "Import Arxiv to search online."
+        "Import Arxiv to search online for the categories of a paper."
         try:
-            client = arxiv.Client()
             search = arxiv.Search(id_list=[arxiv_id])
-            results = client.results(search)
+            results = self.client.results(search)
             paper = next(results, None)
             if paper is None:
                 print(f"Warning：paper with arXiv ID '{arxiv_id}' NOT FOUND")
@@ -169,6 +181,14 @@ class ArxivHTMLExtractor():
             return []  
 
     def extract_figures_to_folder(self, soup, img_path):
+        """
+        Extract figures from a BeautifulSoup object and save them to a folder.
+        Args:
+            soup (BeautifulSoup): A BeautifulSoup object containing the HTML content.
+            img_path (str): The path to the folder where the figures will be saved.
+        Returns:
+            list: A list containing FigureChunk objects, each representing a figure, or an empty list if no figures are found.
+        """
         figures = []
         arxivid = self.extract_arxiv_id(soup)
         for fig in soup.find_all('figure'):
@@ -216,6 +236,13 @@ class ArxivHTMLExtractor():
         return figures
     
     def extract_tables(self, soup):
+        """
+        Extract tables from a BeautifulSoup object.
+        Args:
+            soup (BeautifulSoup): A BeautifulSoup object containing the HTML content.
+        Returns:
+            list: A list containing TableChunk objects, each representing a table, or an empty list if no tables are found.
+        """
         tables = []
         arxivid = self.extract_arxiv_id(soup)
         for table_fig in soup.find_all('figure', class_='ltx_table'):
@@ -242,6 +269,14 @@ class ArxivHTMLExtractor():
         return tables
 
     def extract_docset(self, html: str, img_path) -> DocSet:
+        """
+        Extract a document set from HTML content.
+        Args:
+            html (str): The HTML content to extract information from.
+            img_path (str): The path to the folder where the figures will be saved.
+        Returns:
+            DocSet: A DocSet object containing the extracted information.
+        """
         soup = BeautifulSoup(html, "html.parser")
 
         print("title extracting...")
@@ -268,16 +303,17 @@ class ArxivHTMLExtractor():
         categories = self.get_categories(arxiv_id)
         #print(categories)
 
+
         ################################chunks######################################
         print("tables extracting...")
         tables = self.extract_tables(soup)
         print("figures extracting...")
         figures = self.extract_figures_to_folder(soup,img_path = img_path)
         print("text extracting...")
-        text = self.extract_text(soup)#这个一定要放最后
+        text = self.extract_text(soup)# This must be placed last
         ############################################################################
         
-        self.docs.append(DocSet(
+        add_doc = DocSet(
             doc_id = arxiv_id,
             title = title,
             authors = authors,
@@ -287,20 +323,20 @@ class ArxivHTMLExtractor():
             text_chunks = text,
             figure_chunks = figures,
             table_chunks = tables
-        ))
-
-        return self.docs
+        )
+        self.docs.append(add_doc)
+        return add_doc
     
-    '''def serialize_docs(self, output_dir: str):
-        for doc in self.docs:
-            output_path = Path(output_dir) / f"{doc.doc_id}.json"
-            with open(output_path, "w", encoding="utf-8") as f:
-                f.write(doc.json(indent=4))'''
     def serialize_docs(self, output_dir: str):
+        """
+        Serialize the extracted documents into JSON files.
+        """
         for doc in self.docs:
             output_path = Path(output_dir) / f"{doc.doc_id}.json"
             with open(output_path, "w", encoding="utf-8") as f:
-                # 将 pydantic 模型转换为字典，再用 json.dumps 转换为 JSON 字符串
-                doc_dict = doc.dict()
+                doc_dict = doc.model_dump()
                 json_str = json.dumps(doc_dict, indent=4)
                 f.write(json_str)
+
+    def __del__(self):
+        del self.client
