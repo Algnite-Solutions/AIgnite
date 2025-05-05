@@ -5,8 +5,9 @@ from bs4 import BeautifulSoup
 #new
 from concurrent.futures import ProcessPoolExecutor, as_completed  
 from pathlib import Path
+import os
 
-def test_process_single_html(local_file_path: Path, output_dir: Path):
+def test_process_single_html(local_file_path: Path, output_dir: Path, pdf_path: Path):
     """
     Function to process a single HTML file.
     Args:
@@ -17,11 +18,11 @@ def test_process_single_html(local_file_path: Path, output_dir: Path):
     """
     extractor = ArxivHTMLExtractor()
     html = extractor.load_html(local_file_path)
-    docs = extractor.extract_docset(html, output_dir)
+    docs = extractor.extract_docset(html, output_dir, pdf_path)
     extractor.serialize_docs(output_dir)
     return docs
 
-def test_batch_process_htmls(input_dir: str, output_dir: str, max_workers: int = 9):  
+def test_batch_process_htmls(input_dir: str, output_dir: str, pdf_path: str, max_workers: int = 9):  
     """
     Function to batch process multiple HTML files using a process pool for parallel processing.
     Args:
@@ -36,7 +37,7 @@ def test_batch_process_htmls(input_dir: str, output_dir: str, max_workers: int =
     html_files = list(input_dir.glob("*.html"))  
 
     with ProcessPoolExecutor(max_workers=max_workers) as executor:  
-        futures = [executor.submit(test_process_single_html, html_path, Path(output_dir)) for html_path in html_files]
+        futures = [executor.submit(test_process_single_html, html_path, Path(output_dir), pdf_path) for html_path in html_files]
 
         for future in as_completed(futures):  
             try:  
@@ -47,13 +48,17 @@ def test_batch_process_htmls(input_dir: str, output_dir: str, max_workers: int =
 class TestArxivHTMLExtractor(unittest.TestCase):
 
     def setUp(self):
+
+        # The current directory where test_docparser.py is located
+        base_dir = os.path.dirname(__file__) 
         self.extractor = ArxivHTMLExtractor()
-        self.Your_htmls_folder_path = "/data3/peirongcan/paperIgnite/AIgnite/test/htmls"
-        self.Your_output_path = "/data3/peirongcan/paperIgnite/AIgnite/test/tem"
+        self.Your_htmls_folder_path = str(os.path.join(base_dir, "htmls"))
+        self.Your_output_path = str(os.path.join(base_dir, "tem"))
+        self.Your_pdf_folder_path = str(os.path.join(base_dir, "pdfs"))
 
     def test_correctness_single(self):
         self.extractor.download_html("https://ar5iv.labs.arxiv.org/html/2502.13957",self.Your_htmls_folder_path)
-        docs = test_process_single_html(self.Your_htmls_folder_path+"/2502.13957.html",self.Your_output_path)
+        docs = test_process_single_html(self.Your_htmls_folder_path+"/2502.13957.html",self.Your_output_path, self.Your_pdf_folder_path)
         self.assertEqual(docs.doc_id, "2502.13957")
         self.assertEqual(docs.title, "RAG-Gym: Optimizing Reasoning and Search Agents with Process Supervision")
         self.assertEqual(docs.authors, ["Guangzhi Xiong","Qiao Jin","Xiao Wang","Yin Fang","Haolin Liu","Yifan Yang","Fangyuan Chen","Zhixing Song","Dengyu Wang","Minjia Zhang","Zhiyong Lu","Aidong Zhang"])
@@ -73,7 +78,7 @@ class TestArxivHTMLExtractor(unittest.TestCase):
         self.extractor.download_html("https://ar5iv.labs.arxiv.org/html/2502.03948",self.Your_htmls_folder_path)
         self.extractor.download_html("https://ar5iv.labs.arxiv.org/html/2502.13957",self.Your_htmls_folder_path)
 
-        test_batch_process_htmls(self.Your_htmls_folder_path,self.Your_output_path)
+        test_batch_process_htmls(self.Your_htmls_folder_path,self.Your_output_path,self.Your_pdf_folder_path)
 
     
     def tearDown(self):

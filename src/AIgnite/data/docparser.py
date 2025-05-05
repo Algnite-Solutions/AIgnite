@@ -124,18 +124,18 @@ class ArxivHTMLExtractor():
             sections = article.find_all('section', class_ = ['ltx_section', 'ltx_appendix'])
             if sections:
                 for section in sections:
-                    # 移除figure标签及其内容
+                    # Remove the "figure" tag and its contents
                     for figure in section.find_all('figure'):
                         figure.extract()
                     section_text = section.get_text()
                     section_text = section_text.replace('\n\n', '\n')
-                    # 获取section的id
+                    # get id of section
                     section_id = section.get('id', '')  
                     title_elem = section.find('h2', class_='ltx_title ltx_title_section')
-                    # 获取h2section标题
+                    # get h2section's title
                     title = title_elem.get_text(strip=True) if title_elem else ''  
 
-                    # 这里根据ar5iv的html结构，没有明显可作为caption的内容，先设为title
+                    # based on the html structure of ar5iv, there is no obvious content that can be used as a caption.
                     caption = title 
                     all_text.append(TextChunk(
                         id=section_id,
@@ -267,8 +267,38 @@ class ArxivHTMLExtractor():
                         caption = caption_text
                     ))
         return tables
+    
+    def download_arxiv_pdf(self, arxiv_id: str, save_path):
+        """
+        Download the PDF file on arXiv to the specified path. 
+        Parameter: arxiv_id (str): The arXiv ID of the paper, such as '2106.14834' 
+        save_path (str): to save the local file path of the PDF folder
+        """
+        url = f'https://arxiv.org/pdf/{arxiv_id}.pdf'
 
-    def extract_docset(self, html: str, img_path) -> DocSet:
+        try:
+            response = requests.get(url, stream=True)
+            #Check whether the download was successful
+            response.raise_for_status()  
+            save_path = os.path.join(save_path, f'{arxiv_id}.pdf')
+
+            # Make sure the directory exists.
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+            with open(save_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+
+            print(f"The PDF has been successfully saved to：{save_path}")
+        except requests.HTTPError as e:
+            print(f"Download failed, HTTP error{e}")
+        except Exception as e:
+            print(f"Download failed. Error message:{e}")
+
+        return save_path
+
+    def extract_docset(self, html: str, img_path, pdf_path) -> DocSet:
         """
         Extract a document set from HTML content.
         Args:
@@ -303,6 +333,9 @@ class ArxivHTMLExtractor():
         categories = self.get_categories(arxiv_id)
         #print(categories)
 
+        print("downloading pdf...")
+        pdf_path = self.download_arxiv_pdf(arxiv_id, pdf_path)
+        #print(pdf_path)
 
         ################################chunks######################################
         print("tables extracting...")
@@ -322,7 +355,8 @@ class ArxivHTMLExtractor():
             abstract = abstract,
             text_chunks = text,
             figure_chunks = figures,
-            table_chunks = tables
+            table_chunks = tables,
+            pdf_path = pdf_path 
         )
         self.docs.append(add_doc)
         return add_doc

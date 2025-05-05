@@ -47,3 +47,4 @@ class DocSet(BaseModel):
     figure_chunks: List[Chunk] = Field(default_factory=list)
     table_chunks: List[Chunk] = Field(default_factory=list)
     metadata: dict = Field(default_factory=dict)
+    pdf_path: str
