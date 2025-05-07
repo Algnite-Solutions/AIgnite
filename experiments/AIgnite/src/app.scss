@@ -1,0 +1,64 @@
+/* 引入 Taro UI 图标样式 */
+@import "../node_modules/taro-ui/dist/style/components/icon.scss";
+
+/* 删除无效的字体引用，使用系统默认字体 */
+.iconfont {
+  font-family: sans-serif !important;
+  font-size: 16px;
+  font-style: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.icon-like:before {
+  content: "\e8c3";
+}
+
+.icon-dislike:before {
+  content: "\e8c4";
+}
+
+/* 全局样式 */
+
+/* 禁用所有元素点击时的蓝色闪烁效果 */
+button, a, view, .taro-text {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  outline: none;
+}
+
+/* 修改 TabBar 图标颜色 */
+.tab-bar-item__icon {
+  width: 27px;
+  height: 27px;
+}
+
+/* 未选中状态下的图标 - 保持原始黑白色 */
+.tab-bar-item__icon {
+  filter: opacity(0.5) grayscale(1);
+}
+
+/* 选中状态下的图标 - 添加蓝色 */
+.tab-bar-item--selected .tab-bar-item__icon {
+  filter: opacity(1) drop-shadow(0 0 0 #1296db);
+}
+
+/* 论文卡片中的点赞图标样式 */
+.reaction-btn .icon {
+  filter: grayscale(1) opacity(0.6);
+  transition: filter 0.2s ease;
+}
+
+.reaction-btn.active .icon {
+  filter: drop-shadow(0 0 0 #1296db) opacity(1);
+}
+
+/* 为喜欢按钮添加蓝色 */
+.reaction-btn.active.like-btn .icon {
+  filter: drop-shadow(0 0 0 #1296db) opacity(1);
+}
+
+/* 为不喜欢按钮添加红色 */
+.reaction-btn.active.dislike-btn .icon {
+  filter: drop-shadow(0 0 0 #ff4d4f) opacity(1);
+}

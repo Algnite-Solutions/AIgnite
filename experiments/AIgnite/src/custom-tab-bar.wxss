@@ -1,0 +1,38 @@
+.tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 50px;
+  display: flex;
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.1);
+  background-color: #fff;
+}
+
+.tab-bar-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  font-size: 10px;
+}
+
+.tab-bar-item__icon {
+  width: 27px;
+  height: 27px;
+}
+
+.tab-bar-item__text {
+  font-size: 10px;
+}
+
+/* 未选中的图标样式 */
+.tab-bar-item:not(.tab-bar-item--selected) .tab-bar-item__icon {
+  filter: grayscale(100%) opacity(0.6);
+}
+
+/* 选中的图标样式 */
+.tab-bar-item--selected .tab-bar-item__icon {
+  filter: drop-shadow(0 0 0 #1296db) !important;
+} 

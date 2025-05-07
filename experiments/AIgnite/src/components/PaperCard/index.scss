@@ -1,0 +1,73 @@
+.paper-card {
+  .title {
+    font-size: 18px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .authors {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 12px;
+    display: block;
+  }
+
+  .abstract {
+    font-size: 14px;
+    color: #666;
+    line-height: 1.5;
+    display: block;
+  }
+
+  .paper-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 12px;
+  }
+
+  .interpretation-tag {
+    display: inline-block;
+    background: #e6f7ff;
+    color: #1296db;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+
+  .reaction-buttons {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .reaction-btn {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    
+    &.active {
+      background-color: #f0f0f0;
+      
+      .count {
+        color: #1296db;
+        font-weight: 500;
+      }
+    }
+    
+    .icon {
+      width: 20px;
+      height: 20px;
+      margin-right: 4px;
+    }
+    
+    .count {
+      font-size: 14px;
+      color: #666;
+    }
+  }
+} 
