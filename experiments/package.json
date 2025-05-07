@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@eslint/config-array": "^0.20.0",
+    "@eslint/object-schema": "^2.1.6",
+    "@swc-node/register": "^1.10.10",
+    "glob": "^11.0.2",
+    "rimraf": "^6.0.1"
+  }
+}
