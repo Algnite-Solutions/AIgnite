@@ -22,11 +22,11 @@ npm run dev:weapp
 
 __打开微信开发者工具__
 
-![image-20250508010346977](..\AIgnite\assets\image-20250508010346977.png)
+![image-20250508010346977](assets\image-20250508010346977.png)
 
 目录设置为`experiments/AIgnite`中构建的`dist`
 
-![image-20250508010426959](..\AIgnite\assets\image-20250508010426959.png)
+![image-20250508010426959](assets\image-20250508010426959.png)
 
 ## Prerequisites
 
