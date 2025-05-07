@@ -43,5 +43,8 @@ class DocSet(BaseModel):
     categories: List[str]
     published_date: str
     abstract: str
-    chunks: List[Chunk] = Field(default_factory=list)
+    text_chunks: List[Chunk] = Field(default_factory=list)
+    figure_chunks: List[Chunk] = Field(default_factory=list)
+    table_chunks: List[Chunk] = Field(default_factory=list)
     metadata: dict = Field(default_factory=dict)
+    pdf_path: str
