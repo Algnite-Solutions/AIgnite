@@ -4,3 +4,4 @@ lxml
 arxiv
 requests
 urllib3
+google-genai

@@ -1,17 +1,10 @@
-# Experiments
-Supported datasets:
-1. DocFinQA (dataset/docfinqa.py)
-2. NovelQA (dataset/novelqa.py)
+# Generate gemini blogs
+Go the main folder of AIgnite and run docparser test case to download pdfs
+`
+cd ..
+python test/test_docparser.py
+`
 
-## Start vLLM server
-```bash
-vllm serve deepseek-ai/DeepSeek-R1-Distill-Llama-8B \
-    --tensor-parallel-size 4 \
-    --max-model-len 100000 \
-    --enforce-eager \
-    --port 8000 &
-```
-## Run Testing
-```
-python main.py
-```
+`
+python experiments/main_generator.py
+`

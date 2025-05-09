@@ -1,6 +1,9 @@
 # Large data folder
 datasets
 experiments/data/
+test/htmls/
+test/pdfs/
+test/tem/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
