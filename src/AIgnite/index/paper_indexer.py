@@ -104,19 +104,18 @@ class PaperIndexer(BaseIndexer):
                 # Create document with metadata
                 
                 # Add text chunks as separate nodes
-                for chunk in paper.chunks:
-                    if chunk.type == "text":
-                        doc_chunk = Document(
-                            text=chunk.text,
-                            metadata={
-                                "doc_id": paper.doc_id,
-                                "title": paper.title,
-                                "authors": paper.authors,
-                                "categories": paper.categories,
-                                "published_date": paper.published_date
-                            }
-                        )
-                        self.index.insert(doc_chunk)
+                for chunk in paper.text_chunks:
+                    doc_chunk = Document(
+                        text=chunk.text,
+                        metadata={
+                            "doc_id": paper.doc_id,
+                            "title": paper.title,
+                            "authors": paper.authors,
+                            "categories": paper.categories,
+                            "published_date": paper.published_date
+                        }
+                    )
+                    self.index.insert(doc_chunk)
                 # Store full metadata
                 self.metadata_store[paper.doc_id] = {
                     "title": paper.title,
@@ -184,7 +183,7 @@ class PaperIndexer(BaseIndexer):
         except Exception as e:
             raise RuntimeError(f"Failed to find similar papers: {str(e)}")
 
-
+'''
 if __name__ == "__main__":
     try:
         indexer = PaperIndexer()
@@ -197,3 +196,4 @@ if __name__ == "__main__":
             except Exception:
                 pass
             indexer.embedding_model.model = None
+'''
