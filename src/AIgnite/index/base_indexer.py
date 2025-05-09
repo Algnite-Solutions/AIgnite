@@ -1,6 +1,6 @@
 from typing import List, Optional
 from abc import ABC, abstractmethod
-from ..docset import DocSet
+from ..data.docset import DocSet
 
 class BaseIndexer(ABC):
     @abstractmethod
