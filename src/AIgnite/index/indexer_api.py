@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 import uvicorn
 
 from .paper_indexer import PaperIndexer
-from ..data.docset import DocSet, TextChunk, FigureChunk, TableChunk, ChunkType
+from ..data.docset import DocSet, TextChunk, FigureChunk, TableChunk, ChunkType,DocSetList
 
 # --- Initialize API and PaperIndexer ---
 app = FastAPI()
@@ -28,8 +28,8 @@ class DocSetInput(BaseModel):
     table_chunks: List[TableChunk]
     metadata: Optional[Dict[str, Any]] = {}
 
-class DocSetList(RootModel):
-    root: List[DocSetInput]
+#class DocSetList(RootModel):
+#    root: List[DocSetInput]
 
 class SimilarQuery(BaseModel):
     query: str
@@ -40,7 +40,7 @@ class SimilarQuery(BaseModel):
 @app.post("/index_papers/")
 async def index_papers(docset_list: DocSetList):
     try:
-        papers = docset_list.root
+        papers = docset_list.docsets
         docsets = []
         for paper in papers:
             text_chunks = [TextChunk(**chunk.dict()) for chunk in paper.text_chunks]

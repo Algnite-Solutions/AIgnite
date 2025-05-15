@@ -4,7 +4,9 @@ import asyncio
 BASE_URL = "http://127.0.0.1:5002"
 
 # Sample paper for testing
-sample_papers = [
+sample_papers = {
+    "docsets": 
+    [
     {
         "doc_id": "paper_001",
         "title": "Example Paper on FastAPI",
@@ -85,12 +87,13 @@ sample_papers = [
         "table_chunks": [],
         "metadata": {}
     }
-]
+]}
 
 
 # --- Async test functions ---
 async def test_index_papers():
     async with httpx.AsyncClient() as client:
+        #response = await client.post(f"{BASE_URL}/index_papers/", json=sample_papers)
         response = await client.post(f"{BASE_URL}/index_papers/", json=sample_papers)
         assert response.status_code == 200, f"Indexing failed: {response.text}"
         print("✅ Paper indexed successfully:", response.json())
