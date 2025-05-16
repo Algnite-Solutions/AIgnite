@@ -1,19 +1,5 @@
 import unittest
 from typing import List
-from datetime import datetime
-import sys
-import os
-os.environ['http_proxy'] = "http://127.0.0.1:7890" 
-os.environ['https_proxy'] = "http://127.0.0.1:7890" 
-
-# Set OpenAI API key
-os.environ['OPENAI_API_KEY'] = ""  # Replace with your actual API key
-
-# Add the src directory to Python path
-#sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-
-sys.path.append('/data3/guofang/AIgnite/src/')
-
 from AIgnite.data.docset import DocSet, Chunk, TextChunk, FigureChunk, TableChunk, ChunkType
 from AIgnite.index.paper_indexer import PaperIndexer
 

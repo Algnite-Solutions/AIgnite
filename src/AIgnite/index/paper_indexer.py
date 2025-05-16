@@ -1,21 +1,8 @@
-import sys
-import os
-from pathlib import Path
-
-# Add the src directory to Python path
-src_path = str(Path(__file__).parent.parent.parent)
-if src_path not in sys.path:
-    sys.path.append(src_path)
-
 from typing import List, Optional, Dict, Any
 import faiss
-from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Document
+from llama_index.core import VectorStoreIndex, Document
 from FlagEmbedding import FlagModel
 from llama_index.vector_stores.faiss import FaissVectorStore
-from llama_index.core.schema import BaseNode, TextNode
-from llama_index.core.retrievers import VectorIndexRetriever
-from llama_index.core.query_engine import RetrieverQueryEngine
-from llama_index.core.postprocessor import SimilarityPostprocessor
 from llama_index.core.embeddings import BaseEmbedding
 from pydantic import Field
 
@@ -64,9 +51,7 @@ class PaperIndexer(BaseIndexer):
     def __init__(self, embedding_model=None):
         # Use BGE model by default
         self.embedding_model = embedding_model or BGEEmbedding(
-            'BAAI/bge-base-en-v1.5',
-            use_fp16=True,  # Use half precision for faster inference
-            device='cuda'  # Use GPU if available
+            'BAAI/bge-base-en-v1.5'
         )
         # Create a FAISS index
         dimension = self.embedding_model.dimensions
@@ -79,7 +64,7 @@ class PaperIndexer(BaseIndexer):
         # Create storage context with the vector store
         storage_context = StorageContext.from_defaults(
             vector_store=self.vector_store
-        )
+        ) 
         # Create an initial document
         initial_doc = Document(
             text="Initial document",
