@@ -48,3 +48,6 @@ class DocSet(BaseModel):
     table_chunks: List[Chunk] = Field(default_factory=list)
     metadata: dict = Field(default_factory=dict)
     pdf_path: str
+
+class DocSetList(BaseModel):
+    docsets: List[DocSet]
