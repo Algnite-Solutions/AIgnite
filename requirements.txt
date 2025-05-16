@@ -1,7 +1,6 @@
 pydantic==2.11.3
-llama-index>=0.10.0
+llama-index
 llama-index-vector-stores-faiss
-llama-index-embeddings-huggingface
 sentence-transformers
 openai
 numpy==1.24.3
