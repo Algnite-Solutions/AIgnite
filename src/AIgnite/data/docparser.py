@@ -3,6 +3,8 @@ from .docset import DocSet, TextChunk, FigureChunk, TableChunk, ChunkType
 from uuid import uuid4
 from pathlib import Path
 #new
+from google import genai
+from google.genai import types
 import arxiv
 import os
 import requests
@@ -374,3 +376,80 @@ class ArxivHTMLExtractor():
 
     def __del__(self):
         del self.client
+
+class ArxivLaTeXExtractor():
+    def __init__(self, latex_floder_path):
+        self.latex_path = latex_floder_path
+        self.docs = []
+
+    def get_imgs(self,output_img_path):
+        pass
+
+    def get_tables(self):
+        pass
+
+    def serialize_docs(self, output_dir: str):
+        """
+        Serialize the extracted documents into JSON files.
+        """
+        for doc in self.docs:
+            output_path = Path(output_dir) / f"{doc.doc_id}.json"
+            with open(output_path, "w", encoding="utf-8") as f:
+                doc_dict = doc.model_dump()
+                json_str = json.dumps(doc_dict, indent=4)
+                f.write(json_str)
+
+class ArxivPDFExtractor():
+    def __init__(self):
+        self.docs = []
+
+    def get_imgs(self,output_img_path):
+        # Create a client
+        os.environ['http_proxy'] = "http://127.0.0.1:7890"
+        os.environ['https_proxy'] = "http://127.0.0.1:7890"
+        api_key = "AIzaSyDQS4jFfedzDourgwQxiP4hhOR0lK67l44"
+        client = genai.Client(api_key=api_key)
+        
+        model_id =  "gemini-2.0-flash-preview-image-generation" # or "gemini-2.0-flash-lite-preview-02-05"  , "gemini-2.0-pro-exp-02-05"
+
+        my_test_pdf = client.files.upload(file="/data3/peirongcan/paperIgnite/AIgnite/test/pdf_imgs/a0ff53f39178ce535bb430ee1f5d0bd.png", config={'display_name': 'test'})
+        file_size = client.models.count_tokens(model=model_id,contents=my_test_pdf)
+        print(f'File: {my_test_pdf.display_name} equals to {file_size.total_tokens} tokens')
+
+        prompt = f"I gave you a image named my_test_pdf. This is one page of a paper, Please return the figure in the paper. Please use the cropping function to cut out part of the picture instead of generating a new one"
+        response = client.models.generate_content(model=model_id, contents=[prompt, my_test_pdf], config=types.GenerateContentConfig(response_modalities=['TEXT', 'IMAGE']))
+        # Convert the response to the pydantic model and return it
+        print(type(response))
+        #print(response)
+        # 假设 response 是你拿到的响应对象
+
+        image_data = None
+        for part in response.candidates[0].content.parts:
+            if part.inline_data and part.inline_data.mime_type == "image/png":
+                image_data = part.inline_data.data
+                break
+
+        if image_data:
+            with open("/data3/peirongcan/paperIgnite/AIgnite/test/pdf_imgs/image.jpg", "wb") as f:
+                f.write(image_data)
+            print("图像已保存为image.jpg")
+        else:
+            print("没有找到图像数据")
+
+    def get_tables(self):
+        pass
+
+    def serialize_docs(self, output_dir: str):
+        """
+        Serialize the extracted documents into JSON files.
+        """
+        for doc in self.docs:
+            output_path = Path(output_dir) / f"{doc.doc_id}.json"
+            with open(output_path, "w", encoding="utf-8") as f:
+                doc_dict = doc.model_dump()
+                json_str = json.dumps(doc_dict, indent=4)
+                f.write(json_str)
+
+if __name__ == '__main__':
+    pdf_extractor = ArxivPDFExtractor()
+    pdf_extractor.get_imgs("/data3/peirongcan/paperIgnite/AIgnite/test/pdf_imgs")
