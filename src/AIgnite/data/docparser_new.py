@@ -23,20 +23,23 @@ from urllib3.util.retry import Retry
 import base64
 from volcengine.visual.VisualService import VisualService
 import json
-
-'''
-TODO 
-1.change the init_docset and store the metadata in the docset dirctly
-2.store the raw html in a folder and delete the url_folder.
-3.change test function
-4.add pdf_extractor if html dont work
-'''
+import fitz 
+import aspose.pdf as ap
 
 class ArxivHTMLExtractor():
     """
     A class used to extract information from daily arXiv HTMLs and serialize it into JSON files.
+    if there not exist a html then use pdf to extract the remain.
     """
-    def __init__(self, html_text_folder, pdf_folder_path, arxiv_pool, image_folder_path,json_path):
+    def __init__(self, html_text_folder, pdf_folder_path, arxiv_pool, image_folder_path, json_path):
+        '''
+        Args:
+        html_text_folder: the folder path used to store the .html file.
+        pdf_folder_path: the folder path used to store the .pdf (and .md) file.
+        arxiv_pool: path of a .txt file to store the arxiv_id which is serialized successfully
+        image_folder_path:  the folder path used to store the .png file.
+        json_path: the folder path used to store the .json file.
+        '''
         self.date = datetime.now(timezone.utc).date()
         self.docs = []
         self.html_text_folder = html_text_folder
@@ -44,32 +47,37 @@ class ArxivHTMLExtractor():
         self.arxiv_pool = arxiv_pool
         self.image_folder_path = image_folder_path
         self.json_path = json_path
-        self.pdf_parser_helper = ArxivPDFExtractor(self.docs, pdf_folder_path, image_folder_path)
+        #Helper
+        self.pdf_parser_helper = ArxivPDFExtractor(self.docs, pdf_folder_path, image_folder_path, arxiv_pool, json_path)
 
-###################################################   Search papers and Update Docset’s metadata part    ############################################################
     
     def init_docset(self):
+        """
+        Initialize the docset with papers some metadata:
+        doc_id, title, authors, categories, published_date, abstract, pdf_path, HTML_path
+        The 3 types of chunk remain to add
+        """
         client = arxiv.Client()
         one_day = timedelta(days=1)
         yesterday = self.date - one_day
-
         exact_time = "0600"
         today_str = self.date.strftime("%Y%m%d") + exact_time
         yesterday_str = yesterday.strftime("%Y%m%d") + exact_time
-        print(today_str)
-        #query = "cat:cs.* AND submittedDate:[" + yesterday_str + " TO " + today_str + "]"
-        query = "cat:cs.* AND submittedDate:[202504190600 TO 202504200600]"
-        print(today_str,yesterday_str)
+
+        #using the format of arxiv api
+        query = "cat:cs.* AND submittedDate:[" + yesterday_str + " TO " + today_str + "]"
+        #query = "cat:cs.* AND submittedDate:[202504190600 TO 202504200600]"
 
         search = arxiv.Search(
             query=query,
-            max_results=1,  # You can set max papers you want here
+            max_results=3,  # You can set max papers you want here
             sort_by=arxiv.SortCriterion.SubmittedDate
         )
 
         print(f"grabbing arXiv papers in cs.* submitted from {yesterday} to {self.date}......")
         #print(f"grabbing arXiv papers in cs.* submitted from 202504190600 to 202504200600......")
 
+        # Test if we have extracted already or not. Download pdf and try to download html
         for result in client.results(search):
             time.sleep(15)
             html_url = result.pdf_url.replace("pdf", "html")
@@ -114,9 +122,6 @@ class ArxivHTMLExtractor():
                 print(f"request failed: {e}, DocSet will not include this HTML.")
 
         self.serialize_docs_init()
-
-
-#########################################################   Update Docset’s chunk part   ####################################################################
 
 
     def extract_text(self, soup: BeautifulSoup):
@@ -227,11 +232,10 @@ class ArxivHTMLExtractor():
                     ))
         return tables
     
-                    
-#########################################################   Total update dataset function   ####################################################################
-
-    def extract_all_htmls(self, img_path = "", pdf_path = "") -> DocSet:
-
+    def extract_all_htmls(self) -> DocSet:
+        """
+        All in one function.
+        """
         self.init_docset()
 
         for filename in os.listdir(self.html_text_folder):
@@ -255,10 +259,7 @@ class ArxivHTMLExtractor():
         self.docs = self.pdf_parser_helper.docs
 
         self.serialize_docs()
-
-    def extract_remain_papers_using_pdf(self, img_path = "", pdf_path = "") -> DocSet:
-        pass
-                        
+                   
     def serialize_docs(self):
         """
         Serialize the extracted documents into JSON files.
@@ -285,42 +286,246 @@ class ArxivHTMLExtractor():
                 json_str = json.dumps(doc_dict, indent=4)
                 f.write(json_str)
 
+class ArxivPDFExtractor():
+    def __init__(self, docs, pdf_folder_path, image_folder_path, arxiv_pool, json_path):
+        if docs is None:
+            self.docs = []
+        else:
+            self.docs = docs
+        self.pdf_folder_path = pdf_folder_path
+        self.image_folder_path = image_folder_path
+        self.pdf_paths = []
+        self.arxiv_pool = arxiv_pool
+        self.json_path = json_path
+        self.date = datetime.now(timezone.utc).date()
+
+    def init_docset(self):
+        client = arxiv.Client()
+        one_day = timedelta(days=1)
+        yesterday = self.date - one_day
+
+        exact_time = "0600"
+        today_str = self.date.strftime("%Y%m%d") + exact_time
+        yesterday_str = yesterday.strftime("%Y%m%d") + exact_time
+        print(today_str)
+        query = "cat:cs.* AND submittedDate:[" + yesterday_str + " TO " + today_str + "]"
+        #query = "cat:cs.* AND submittedDate:[202504190900 TO 202504200600]"
+        print(today_str,yesterday_str)
+
+        search = arxiv.Search(
+            query=query,
+            max_results=10,  # You can set max papers you want here
+            sort_by=arxiv.SortCriterion.SubmittedDate
+        )
+
+        print(f"grabbing arXiv papers in cs.* submitted from {yesterday} to {self.date}......")
+        #print(f"grabbing arXiv papers in cs.* submitted from 202504190600 to 202504200600......")
+
+        tem = client.results(search)
+        tem = list(tem)
+        print("successful search!")
+        for result in tem:
+            print(1)
+            #time.sleep(5)
+            arxiv_id = result.pdf_url.split('/')[-1]
+            print(2)
+            with open(self.arxiv_pool, "r", encoding="utf-8") as f:
+                if arxiv_id in f.read():
+                    print(f"{arxiv_id} is already extracted before!")
+                    continue
+            #add basic info
+            print(3)
+            add_doc = DocSet(
+            doc_id=arxiv_id,
+            title=result.title,
+            authors=[author.name for author in result.authors],
+            categories=result.categories,
+            published_date=str(result.published),
+            abstract=result.summary,
+            pdf_path=str(os.path.join(self.pdf_folder_path, f'{arxiv_id}.pdf')),
+            #Set htmlpath to None first and update it later
+            HTML_path=None )
+            print(4)
+
+            print(arxiv_id)
+            result.download_pdf(dirpath = self.pdf_folder_path, filename=f"{arxiv_id}.pdf")
+            print(5)
+
+            self.docs.append(add_doc)
+
+        #self.serialize_docs_init()
+
+    def extract_all(self):
+        self.init_docset()
+        for doc in self.docs:
+            path = doc.pdf_path
+            print("getting markdown...")
+            markdown_path = get_pdf_md(path,self.pdf_folder_path,doc.doc_id)
+            print("done")
+            if markdown_path:
+                doc.figure_chunks = self.pdf_images_chunk(markdown_path,self.image_folder_path,doc.doc_id)
+                doc.table_chunks = self.pdf_tables_chunk(markdown_path)
+                doc.text_chunks = self.pdf_text_chunk(markdown_path)#一定在最后
+        self.serialize_docs()
+
+    def remain_docparser(self):
+        """
+        Help HTMLExtractor. We don't use it in the process of PDF's extractor
+        """
+        for doc in self.docs:
+            if doc.HTML_path == None:
+                self.pdf_paths.append(str(Path(self.pdf_folder_path) / f"{doc.doc_id}.pdf"))
+                print(self.pdf_paths)
+
+                for path in self.pdf_paths:
+                    print("getting markdown...")
+                    markdown_path = get_pdf_md(path,self.pdf_folder_path,doc.doc_id)
+                    print("done")
+                    doc.figure_chunks = self.pdf_images_chunk(markdown_path,self.image_folder_path,doc.doc_id)
+                    doc.table_chunks = self.pdf_tables_chunk(markdown_path)
+                    doc.text_chunks = self.pdf_text_chunk(markdown_path)#一定在最后
+                   
+    def pdf_images_chunk(self, markdown_path, image_folder_path, doc_id):
+        figures = []
+
+        try:
+            # read Markdown
+            with open(markdown_path, 'r', encoding='utf-8') as f:
+                md_content = f.read()
+                
+            image_list = _parse_image_urls(md_content, doc_id)
+            if not image_list:
+                print("Warning: No image link was found in Markdown")
+                return
+                
+            os.makedirs(image_folder_path, exist_ok=True)
+            
+            # download
+            success_count = 0
+            for name, url, caption in image_list:
+                if _download_single_image(name, url, image_folder_path):
+                    success_count += 1
+                    figures.append(FigureChunk(
+                        id = None,
+                        title = name,
+                        type = ChunkType.FIGURE,
+                        image_path = str(os.path.join(image_folder_path, name)),
+                        alt_text = "Refer to caption",
+                        caption = caption
+                    ))
+            
+            print(f"\n📌 Download completed: process{len(image_list)} figures totally, {success_count} Successfully")
+            
+        except FileNotFoundError:
+            print(f"Error: Markdown Not Found - {markdown_path}")
+            
+        except Exception as e:
+            print(f"program exception:{str(e)}")
+        
+        #print(figures)
+        return figures
+        
+    def pdf_tables_chunk(self, markdown_path):
+        tables = []
+        try:
+            with open(markdown_path, 'r', encoding='utf-8') as f:
+                md_content = f.read()
+
+            soup = BeautifulSoup(md_content, 'html.parser')
+            all_tables = soup.find_all('table')
+
+            for idx, table in enumerate(all_tables):
+                table_html = str(table)
+
+                # Find the text position of this table in the Markdown content
+                table_pos = md_content.find(table_html)
+                context_before = md_content[max(0, table_pos - 500):table_pos]
+
+                # Look for the Table title from the previous text
+                caption_match = re.search(r'(Table\s*\d+[.:]?\s*)([^\n<]+)', context_before, re.IGNORECASE)
+                if caption_match:
+                    table_name = caption_match.group(1).strip().replace(':', '').replace('.', '')
+                    caption_text = caption_match.group(2).strip()
+                else:
+                    table_name = f'table_{idx+1}'
+                    caption_text = ''
+
+                tables.append(TableChunk(
+                    id=None,
+                    title=table_name,
+                    type=ChunkType.TABLE,
+                    table_html=table_html,
+                    caption=caption_text
+                ))
+                
+
+        except FileNotFoundError:
+            print(f"Error: Markdown Not Found - {markdown_path}")
+        except Exception as e:
+            print(f"program exception:{str(e)}")
+        #print(tables)
+        return tables
+    
+    def pdf_text_chunk(self, markdown_path) -> List[TextChunk]:
+        all_text = []
+
+        try:
+            with open(markdown_path, 'r', encoding='utf-8') as f:
+                md_content = f.read()
+            md_content = re.sub(r'^!\[fig_[^\n]*\n?', '', md_content, flags=re.MULTILINE)
+
+            # 查找所有一级标题（## 开头，排除如 2.1 开头的子标题）
+            # pattern = r'(?:^|\n)(##\s+(?!\d+\.)[^\n]+)'
+            pattern = r'(?:^|\n)(##\s+(?![A-Za-z0-9]+\.)[^\n]+)'
+            matches = list(re.finditer(pattern, md_content))
+
+            # 为方便处理，记录所有段落起始位置
+            section_boundaries = [m.start() for m in matches]
+            section_boundaries.append(len(md_content))  # 加入最后的终点
+
+            for i in range(len(matches)):
+                start = section_boundaries[i]
+                end = section_boundaries[i + 1]
+                section_text = md_content[start:end].strip()
+
+                header_line = matches[i].group(1).strip()
+                title = header_line.lstrip('#').strip()
+
+                section_id = f"text_{i+1}"
+
+                all_text.append(TextChunk(
+                    id=section_id,
+                    type=ChunkType.TEXT,
+                    title=title,
+                    caption=title,
+                    text=section_text
+                ))
+
+        except FileNotFoundError:
+            print(f"错误：Markdown文件未找到 - {markdown_path}")
+        except Exception as e:
+            print(f"程序异常：{str(e)}")
+        return all_text
+    
+    def serialize_docs(self):
+        """
+        Serialize the extracted documents into JSON files.
+        """
+        output_dir = self.json_path
+        for doc in self.docs:
+            with open(self.arxiv_pool, "a", encoding="utf-8") as f:
+                f.write(doc.doc_id+'\n')
+            output_path = Path(output_dir) / f"{doc.doc_id}.json"
+            with open(output_path, "w", encoding="utf-8") as f:
+                doc_dict = doc.model_dump()
+                json_str = json.dumps(doc_dict, indent=4)
+                f.write(json_str)
 
 ############################################################### Some Tools ####################################################################
 
-'''def download_arxiv_pdf(arxiv_id: str, save_path):
-    """
-    Download the PDF file on arXiv to the specified path. 
-    Parameter: arxiv_id (str): The arXiv ID of the paper, such as '2106.14834' 
-    save_path (str): to save the local file path of the PDF folder
-    """
-    
-    url = f'https://arxiv.org/pdf/{arxiv_id}.pdf'
-
-    try:
-        response = requests.get(url, stream=True)
-        #Check whether the download was successful
-        response.raise_for_status()  
-        save_path = os.path.join(save_path, f'{arxiv_id}.pdf')
-
-        # Make sure the directory exists.
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-
-        with open(save_path, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
-
-        print(f"The PDF has been successfully saved to：{save_path}")
-    except requests.HTTPError as e:
-        print(f"Download failed, HTTP error{e}")
-    except Exception as e:
-        print(f"Download failed. Error message:{e}")
-
-    return save_path
-'''
 
 def download_arxiv_pdf(arxiv_id: str, save_path):
+    "已弃用"
     """
     Download the PDF file on arXiv to the specified path with retry logic.
     Parameter: arxiv_id (str): The arXiv ID of the paper, such as '2106.14834' 
@@ -334,16 +539,16 @@ def download_arxiv_pdf(arxiv_id: str, save_path):
         try:
             response = requests.get(url, stream=True)
             response.raise_for_status()  # 检查HTTP响应状态码
-            save_path = os.path.join(save_path, f'{arxiv_id}.pdf')
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            file_path = os.path.join(save_path, f'{arxiv_id}.pdf')
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
-            with open(save_path, 'wb') as f:
+            with open(file_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
 
-            print(f"PDF successfully saved to: {save_path}")
-            return save_path
+            print(f"PDF successfully saved to: {file_path}")
+            return file_path
 
         except requests.HTTPError as e:
             error_code = response.status_code
@@ -386,7 +591,8 @@ def get_img_from_url(arxivid,img_src):
 def get_pdf_md(path,store_path,name):
     visual_service = VisualService()
     # call below method if you dont set ak and sk in $HOME/.volc/config
-    visual_service.set_ak('') attention!
+    attention ！
+    visual_service.set_ak('')
     visual_service.set_sk('')
 
     params = dict()
@@ -401,8 +607,26 @@ def get_pdf_md(path,store_path,name):
         "filter_header": "true"           # 过滤页眉页脚水印
     }
 
+    if os.path.getsize(path) > 8*1024*1024:
+        print(f"📦 PDF 超过 8MB，需要压缩。")
+        try:
+            compressPdfDocument = ap.Document(path)  # 需要压缩的pdf文件路径
+            pdfoptimizeOptions = ap.optimization.OptimizationOptions()
+            pdfoptimizeOptions.image_compression_options.compress_images = True
+            pdfoptimizeOptions.image_compression_options.image_quality = 90
+            compressPdfDocument.optimize_resources(pdfoptimizeOptions)
+            compressPdfDocument.save(path)  # 需要压缩后保存的文件路径
+        except Exception as e:
+            print(f"⚠️ 压缩失败：{e}")
+            return None
+
     # 请求
-    resp = visual_service.ocr_pdf(form)
+    try:
+        resp = visual_service.ocr_pdf(form)
+    except Exception as e:
+        print("Visual OCR error:", str(e))
+        raise
+    file_path = None
 
     if resp["data"]:
         markdown = resp["data"]["markdown"] # markdown 字符串
@@ -517,232 +741,6 @@ def _download_single_image(name: str, url: str, save_dir: str) -> bool:
         return False
 
 
-############################################### PDF #########################################################
-
-class ArxivPDFExtractor():
-    def __init__(self, docs, pdf_folder_path, image_folder_path, arxiv_pool, json_path):
-        if docs is None:
-            self.docs = []
-        else:
-            self.docs = docs
-        self.pdf_folder_path = pdf_folder_path
-        self.image_folder_path = image_folder_path
-        self.pdf_paths = []
-        self.arxiv_pool = arxiv_pool
-        self.json_path = json_path
-        self.date = datetime.now(timezone.utc).date()
-
-    def init_docset(self):
-        client = arxiv.Client()
-        one_day = timedelta(days=1)
-        yesterday = self.date - one_day
-
-        exact_time = "0600"
-        today_str = self.date.strftime("%Y%m%d") + exact_time
-        yesterday_str = yesterday.strftime("%Y%m%d") + exact_time
-        print(today_str)
-        #query = "cat:cs.* AND submittedDate:[" + yesterday_str + " TO " + today_str + "]"
-        query = "cat:cs.* AND submittedDate:[202504190600 TO 202504200600]"
-        print(today_str,yesterday_str)
-
-        search = arxiv.Search(
-            query=query,
-            max_results=5,  # You can set max papers you want here
-            sort_by=arxiv.SortCriterion.SubmittedDate
-        )
-
-        print(f"grabbing arXiv papers in cs.* submitted from {yesterday} to {self.date}......")
-        #print(f"grabbing arXiv papers in cs.* submitted from 202504190600 to 202504200600......")
-
-        for result in client.results(search):
-            time.sleep(5)
-            arxiv_id = result.pdf_url.split('/')[-1]
-            with open(self.arxiv_pool, "r", encoding="utf-8") as f:
-                if arxiv_id in f.read():
-                    print(f"{arxiv_id} is already extracted before!")
-                    continue
-            #add basic info
-            add_doc = DocSet(
-            doc_id=arxiv_id,
-            title=result.title,
-            authors=[author.name for author in result.authors],
-            categories=result.categories,
-            published_date=str(result.published),
-            abstract=result.summary,
-            pdf_path=download_arxiv_pdf(arxiv_id, self.pdf_folder_path),
-            #Set htmlpath to None first and update it later
-            HTML_path=None )
-
-            self.docs.append(add_doc)
-
-        #self.serialize_docs_init()
-
-    def extract_all(self):
-        self.init_docset()
-        for doc in self.docs:
-            path = doc.pdf_path
-            print("getting markdown...")
-            markdown_path = get_pdf_md(path,self.pdf_folder_path,doc.doc_id)
-            print("done")
-            doc.figure_chunks = self.pdf_images_chunk(markdown_path,self.image_folder_path,doc.doc_id)
-            doc.table_chunks = self.pdf_tables_chunk(markdown_path)
-            doc.text_chunks = self.pdf_text_chunk(markdown_path)#一定在最后
-        self.serialize_docs()
-
-    def remain_docparser(self):
-        for doc in self.docs:
-            if doc.HTML_path == None:
-                self.pdf_paths.append(str(Path(self.pdf_folder_path) / f"{doc.doc_id}.pdf"))
-                print(self.pdf_paths)
-
-                for path in self.pdf_paths:
-                    print("getting markdown...")
-                    markdown_path = get_pdf_md(path,self.pdf_folder_path,doc.doc_id)
-                    print("done")
-                    doc.figure_chunks = self.pdf_images_chunk(markdown_path,self.image_folder_path,doc.doc_id)
-                    doc.table_chunks = self.pdf_tables_chunk(markdown_path)
-                    doc.text_chunks = self.pdf_text_chunk(markdown_path)#一定在最后
-                   
-    def pdf_images_chunk(self, markdown_path, image_folder_path, doc_id):
-        figures = []
-
-        try:
-            # 读取Markdown内容
-            with open(markdown_path, 'r', encoding='utf-8') as f:
-                md_content = f.read()
-                
-            # 解析图片信息
-            image_list = _parse_image_urls(md_content, doc_id)
-            if not image_list:
-                print("警告：未在Markdown中发现图片链接")
-                return
-                
-            # 创建保存目录
-            os.makedirs(image_folder_path, exist_ok=True)
-            
-            # 执行下载
-            success_count = 0
-            for name, url, caption in image_list:
-                if _download_single_image(name, url, image_folder_path):
-                    success_count += 1
-                    figures.append(FigureChunk(
-                        id = None,
-                        title = name,
-                        type = ChunkType.FIGURE,
-                        image_path = str(os.path.join(image_folder_path, name)),
-                        alt_text = "Refer to caption",
-                        caption = caption
-                    ))
-            
-            print(f"\n📌 下载完成：共处理{len(image_list)}张图片，成功保存{success_count}张")
-            
-        except FileNotFoundError:
-            print(f"错误：Markdown文件未找到 - {markdown_path}")
-            
-        except Exception as e:
-            print(f"程序异常：{str(e)}")
-        
-        #print(figures)
-        return figures
-        
-
-    def pdf_tables_chunk(self, markdown_path):
-        tables = []
-        try:
-            with open(markdown_path, 'r', encoding='utf-8') as f:
-                md_content = f.read()
-
-            soup = BeautifulSoup(md_content, 'html.parser')
-            all_tables = soup.find_all('table')
-
-            for idx, table in enumerate(all_tables):
-                table_html = str(table)
-
-                # 在 Markdown 内容中查找该表格的文本位置
-                table_pos = md_content.find(table_html)
-                context_before = md_content[max(0, table_pos - 500):table_pos]
-
-                # 从前文中找 Table 标题
-                caption_match = re.search(r'(Table\s*\d+[.:]?\s*)([^\n<]+)', context_before, re.IGNORECASE)
-                if caption_match:
-                    table_name = caption_match.group(1).strip().replace(':', '').replace('.', '')
-                    caption_text = caption_match.group(2).strip()
-                else:
-                    table_name = f'table_{idx+1}'
-                    caption_text = ''
-
-                tables.append(TableChunk(
-                    id=None,
-                    title=table_name,
-                    type=ChunkType.TABLE,
-                    table_html=table_html,
-                    caption=caption_text
-                ))
-                
-
-        except FileNotFoundError:
-            print(f"错误：Markdown文件未找到 - {markdown_path}")
-        except Exception as e:
-            print(f"程序异常：{str(e)}")
-        #print(tables)
-        return tables
-    
-    def pdf_text_chunk(self, markdown_path) -> List[TextChunk]:
-        all_text = []
-
-        try:
-            with open(markdown_path, 'r', encoding='utf-8') as f:
-                md_content = f.read()
-            md_content = re.sub(r'^!\[fig_[^\n]*\n?', '', md_content, flags=re.MULTILINE)
-
-            # 查找所有一级标题（## 开头，排除如 2.1 开头的子标题）
-            # pattern = r'(?:^|\n)(##\s+(?!\d+\.)[^\n]+)'
-            pattern = r'(?:^|\n)(##\s+(?![A-Za-z0-9]+\.)[^\n]+)'
-            matches = list(re.finditer(pattern, md_content))
-
-            # 为方便处理，记录所有段落起始位置
-            section_boundaries = [m.start() for m in matches]
-            section_boundaries.append(len(md_content))  # 加入最后的终点
-
-            for i in range(len(matches)):
-                start = section_boundaries[i]
-                end = section_boundaries[i + 1]
-                section_text = md_content[start:end].strip()
-
-                header_line = matches[i].group(1).strip()
-                title = header_line.lstrip('#').strip()
-
-                section_id = f"text_{i+1}"
-
-                all_text.append(TextChunk(
-                    id=section_id,
-                    type=ChunkType.TEXT,
-                    title=title,
-                    caption=title,
-                    text=section_text
-                ))
-
-        except FileNotFoundError:
-            print(f"错误：Markdown文件未找到 - {markdown_path}")
-        except Exception as e:
-            print(f"程序异常：{str(e)}")
-        return all_text
-    
-    def serialize_docs(self):
-        """
-        Serialize the extracted documents into JSON files.
-        """
-        output_dir = self.json_path
-        for doc in self.docs:
-            with open(self.arxiv_pool, "a", encoding="utf-8") as f:
-                f.write(doc.doc_id+'\n')
-            output_path = Path(output_dir) / f"{doc.doc_id}.json"
-            with open(output_path, "w", encoding="utf-8") as f:
-                doc_dict = doc.model_dump()
-                json_str = json.dumps(doc_dict, indent=4)
-                f.write(json_str)
-
-
 if __name__ == '__main__':
     os.environ['http proxy']="http://127.0.0.1:7890"
     os.environ['https proxy']="http://127.0.0.1:7890"
@@ -758,4 +756,4 @@ if __name__ == '__main__':
     #extractor2.pdf_text_chunk('/data3/peirongcan/paperIgnite/AIgnite/test/pdfs/2505.15817v1.md') 
     #extractor.extract_all_htmls()
     #download_images_from_markdown("/data3/peirongcan/paperIgnite/AIgnite/test/pdfs/2505.13959v1.md", "/data3/peirongcan/paperIgnite/AIgnite/test/imgs")
-
+    #get_pdf_md("/data3/peirongcan/paperIgnite/AIgnite/test/pdfs/2505.17021v1.pdf",'/data3/peirongcan/paperIgnite/AIgnite/test/pdfs',"tem")
