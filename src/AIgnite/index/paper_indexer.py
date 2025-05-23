@@ -1,82 +1,59 @@
 from typing import List, Optional, Dict, Any
-import faiss
-from llama_index.core import VectorStoreIndex, Document
-from FlagEmbedding import FlagModel
-from llama_index.vector_stores.faiss import FaissVectorStore
-from llama_index.core.embeddings import BaseEmbedding
-from pydantic import Field
-
-from llama_index.core import StorageContext
 from .base_indexer import BaseIndexer
 from ..data.docset import DocSet
+from ..db.vector_db import VectorDB
+from ..db.metadata_db import MetadataDB
+from ..db.image_db import MinioImageDB
+import logging
+from tqdm import tqdm
+import os
 
-
-class BGEEmbedding(BaseEmbedding):
-    """Wrapper for BGE model to implement BaseEmbedding interface."""
-    
-    model: Any = Field(default=None, description="The BGE model instance")
-    
-    def __init__(self, model_name: str = 'BAAI/bge-base-en-v1.5', **kwargs):
-        super().__init__()
-        self.model = FlagModel(model_name, **kwargs)
-        self._dimension = 768  # BGE base model dimension
-        
-    def __del__(self):
-        """Cleanup method to properly close the model."""
-        if hasattr(self, 'model') and self.model is not None:
-            try:
-                self.model.stop_self_pool()
-            except Exception:
-                pass
-            self.model = None
-        
-    @property
-    def dimensions(self) -> int:
-        return self._dimension
-        
-    def _get_query_embedding(self, query: str) -> List[float]:
-        return self.model.encode(query).tolist()
-        
-    def _get_text_embedding(self, text: str) -> List[float]:
-        return self.model.encode(text).tolist()
-        
-    async def _aget_query_embedding(self, query: str) -> List[float]:
-        return self._get_query_embedding(query)
-        
-    async def _aget_text_embedding(self, text: str) -> List[float]:
-        return self._get_text_embedding(text)
-
+# Set up logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.DEBUG)
 
 class PaperIndexer(BaseIndexer):
-    def __init__(self, embedding_model=None):
-        # Use BGE model by default
-        self.embedding_model = embedding_model or BGEEmbedding(
-            'BAAI/bge-base-en-v1.5'
-        )
-        # Create a FAISS index
-        dimension = self.embedding_model.dimensions
-        print(f"Using embedding dimension: {dimension}")
-        faiss_index = faiss.IndexFlatL2(dimension)
+    def __init__(self, model_name: str = 'BAAI/bge-base-en-v1.5',
+                 minio_endpoint: str = "localhost:9000",
+                 minio_access_key: str = "ThU32qXfQZHUeGokfpwB",
+                 minio_secret_key: str = "XP2GEnl4udzzv7Xp3DW5Y04oc71ndxxoWqKuAmMR",
+                 minio_bucket: str = "aignite-papers",
+                 db_url: str = None):
+        """Initialize the paper indexer with all required databases.
         
-        # Initialize FAISS vector store with the index
-        self.vector_store = FaissVectorStore(faiss_index=faiss_index)
+        Args:
+            model_name: Name of the embedding model to use
+            minio_endpoint: MinIO server endpoint
+            minio_access_key: MinIO access key
+            minio_secret_key: MinIO secret key
+            minio_bucket: MinIO bucket name
+            db_url: PostgreSQL connection URL (optional)
+        """
+        logger.debug(f"Initializing PaperIndexer with db_url: {db_url}")
         
-        # Create storage context with the vector store
-        storage_context = StorageContext.from_defaults(
-            vector_store=self.vector_store
-        ) 
-        # Create an initial document
-        initial_doc = Document(
-            text="Initial document",
-            metadata={"type": "initial"}
+        # Initialize vector database for text embeddings
+        self.vector_db = VectorDB(model_name=model_name)
+        
+        # Initialize metadata database for paper metadata and relationships
+        self.metadata_db = MetadataDB(db_path=db_url)
+        
+        # Initialize image database for storing figures
+        self.image_db = MinioImageDB(
+            endpoint=minio_endpoint,
+            access_key=minio_access_key,
+            secret_key=minio_secret_key,
+            bucket_name=minio_bucket,
+            secure=False
         )
-        # Create the index with the initial document
-        self.index = VectorStoreIndex.from_documents(
-            [initial_doc],
-            storage_context=storage_context,
-            embed_model=self.embedding_model
-        )
-        self.metadata_store: Dict[str, Dict[str, Any]] = {}
+
+    def __del__(self):
+        """Cleanup method."""
+        if hasattr(self, 'vector_db'):
+            self.vector_db = None
+        if hasattr(self, 'metadata_db'):
+            self.metadata_db = None
+        if hasattr(self, 'image_db'):
+            self.image_db = None
 
     def index_papers(self, papers: List[DocSet]) -> None:
         """Index a list of papers into the vector store.
@@ -85,34 +62,51 @@ class PaperIndexer(BaseIndexer):
             papers: List of DocSet objects containing paper information
         """
         try:
-            for paper in papers:
-                # Create document with metadata
-                
-                # Add text chunks as separate nodes
-                for chunk in paper.text_chunks:
-                    doc_chunk = Document(
-                        text=chunk.text,
-                        metadata={
-                            "doc_id": paper.doc_id,
-                            "title": paper.title,
-                            "authors": paper.authors,
-                            "categories": paper.categories,
-                            "published_date": paper.published_date
-                        }
-                    )
-                    self.index.insert(doc_chunk)
-                # Store full metadata
-                self.metadata_store[paper.doc_id] = {
+            # Main progress bar for papers
+            for paper in tqdm(papers, desc="Indexing papers", unit="paper"):
+                # Create metadata
+                metadata = {
                     "title": paper.title,
                     "abstract": paper.abstract,
                     "authors": paper.authors,
                     "categories": paper.categories,
-                    "published_date": paper.published_date
+                    "published_date": paper.published_date,
+                    "chunk_ids": [chunk.id for chunk in paper.text_chunks],
+                    "image_ids": [chunk.id for chunk in paper.figure_chunks]
                 }
-            
-            
-            
+                
+                # Store PDF if available
+                if hasattr(paper, 'pdf_path') and os.path.exists(paper.pdf_path):
+                    success = self.metadata_db.save_paper(paper.doc_id, paper.pdf_path, metadata)
+                    logger.debug(f"Stored paper and metadata for {paper.doc_id}: {success}")
+                else:
+                    logger.warning(f"No PDF file found for {paper.doc_id}")
+                    continue
+                
+                # Store text chunks in vector database with progress bar
+                text_chunks = [chunk.text for chunk in paper.text_chunks]
+                success = self.vector_db.add_document(
+                    doc_id=paper.doc_id,
+                    abstract=paper.abstract,
+                    text_chunks=text_chunks,
+                    metadata=metadata
+                )
+                logger.debug(f"Added vectors for {paper.doc_id}: {success}")
+                
+                # Store figures in image database with progress bar
+                if paper.figure_chunks:
+                    for figure in tqdm(paper.figure_chunks, desc=f"Storing figures for {paper.doc_id}", leave=False):
+                        success = self.image_db.save_image(
+                            doc_id=paper.doc_id,
+                            image_id=figure.id,
+                            image_path=figure.image_path
+                        )
+                        logger.debug(f"Saved image {figure.id} for {paper.doc_id}: {success}")
+                
         except Exception as e:
+            logger.error(f"Failed to index papers: {str(e)}")
+            # Clean up on failure
+            self.delete_paper(paper.doc_id)
             raise RuntimeError(f"Failed to index papers: {str(e)}")
 
     def get_paper_metadata(self, doc_id: str) -> Optional[dict]:
@@ -124,14 +118,16 @@ class PaperIndexer(BaseIndexer):
         Returns:
             Dictionary containing paper metadata or None if not found
         """
-        return self.metadata_store.get(doc_id)
+        metadata = self.metadata_db.get_metadata(doc_id)
+        logger.debug(f"Retrieved metadata for {doc_id}: {metadata is not None}")
+        return metadata
 
     def find_similar_papers(
         self, 
         query: str, 
         top_k: int = 5, 
         filters: Optional[Dict[str, Any]] = None,
-        similarity_cutoff: float = 0.8
+        similarity_cutoff: float = 0.5
     ) -> List[Dict[str, Any]]:
         """Find papers similar to the query.
         
@@ -145,28 +141,86 @@ class PaperIndexer(BaseIndexer):
             List of dictionaries containing paper information and similarity scores
         """
         try:
-            retriever = self.index.as_retriever(similarity_top_k=top_k)
-            response = retriever.retrieve(query)
-            # Process results
-            results = []
-            for node in response:
-                # Skip results below similarity cutoff
-                if node.score > similarity_cutoff:
+            logger.debug(f"Searching for query: {query}")
+            
+            # Search in vector database
+            results = self.vector_db.search(query, k=top_k * 2)
+            logger.debug(f"Got {len(results)} initial results")
+            
+            # Process and filter results
+            processed_results = []
+            seen_doc_ids = set()
+            
+            for entry, similarity_score in results:
+                doc_id = entry.doc_id
+                if doc_id in seen_doc_ids:
+                    logger.debug(f"Skipping duplicate doc_id: {doc_id}")
                     continue
+                
+                # Get full metadata from metadata database
+                metadata = self.metadata_db.get_metadata(doc_id)
+                if metadata:
+                    paper_info = metadata.copy()
+                    paper_info["similarity_score"] = similarity_score
+                    paper_info["matched_text"] = entry.text
+                    paper_info["match_type"] = entry.text_type
+                    if entry.chunk_id is not None:
+                        paper_info["chunk_id"] = entry.chunk_id
                     
-                doc_id = node.metadata.get("doc_id")
-                if doc_id and doc_id in self.metadata_store:
-                    paper_info = self.metadata_store[doc_id].copy()
-                    paper_info["similarity_score"] = node.score
-                    paper_info["matched_text"] = node.text
-                    results.append(paper_info)
+                    processed_results.append(paper_info)
+                    seen_doc_ids.add(doc_id)
+                    logger.debug(f"Added result: {paper_info['title']} (score: {similarity_score})")
+                    
+                    if len(processed_results) >= top_k:
+                        break
+                else:
+                    logger.warning(f"No metadata found for doc_id: {doc_id}")
             
-            print(f"Found {len(results)} results for query: {query}")
-            
-            return results
+            # Sort by similarity score
+            processed_results.sort(key=lambda x: x["similarity_score"], reverse=True)
+            logger.debug(f"Returning {len(processed_results)} results")
+            return processed_results
             
         except Exception as e:
+            logger.error(f"Failed to find similar papers: {str(e)}")
             raise RuntimeError(f"Failed to find similar papers: {str(e)}")
+
+    def delete_paper(self, doc_id: str) -> bool:
+        """Delete a paper and all its associated data from all databases.
+        
+        Args:
+            doc_id: The document ID of the paper to delete
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            logger.debug(f"Deleting paper {doc_id}")
+            
+            # Get metadata to find associated chunks and images
+            metadata = self.metadata_db.get_metadata(doc_id)
+            if metadata:
+                # Delete from vector database
+                success = self.vector_db.delete_document(doc_id)
+                logger.debug(f"Deleted from vector DB: {success}")
+                
+                # Delete images if they exist
+                if metadata.get("image_ids"):
+                    success = self.image_db.delete_doc_images(doc_id)
+                    logger.debug(f"Deleted images for {doc_id}: {success}")
+                
+                # Delete from metadata database last
+                success = self.metadata_db.delete_paper(doc_id)
+                logger.debug(f"Deleted from metadata DB: {success}")
+                
+                return True
+            else:
+                logger.warning(f"No metadata found for doc_id: {doc_id}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Failed to delete paper {doc_id}: {str(e)}")
+            return False
 
 '''
 if __name__ == "__main__":
