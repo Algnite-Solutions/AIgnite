@@ -25,6 +25,12 @@ from volcengine.visual.VisualService import VisualService
 import json
 import fitz 
 import aspose.pdf as ap
+from PyPDF2 import PdfReader, PdfWriter
+import img2pdf
+from PIL import Image
+import io
+import tempfile
+
 
 class ArxivHTMLExtractor():
     """
@@ -95,7 +101,7 @@ class ArxivHTMLExtractor():
                 categories=result.categories,
                 published_date=str(result.published),
                 abstract=result.summary,
-                pdf_path=download_arxiv_pdf(arxiv_id, self.pdf_folder_path),
+                #pdf_path=download_arxiv_pdf(arxiv_id, self.pdf_folder_path),
                 #Set htmlpath to None first and update it later
                 HTML_path=None 
             )
@@ -348,7 +354,16 @@ class ArxivPDFExtractor():
             print(4)
 
             print(arxiv_id)
-            result.download_pdf(dirpath = self.pdf_folder_path, filename=f"{arxiv_id}.pdf")
+            #download_arxiv_pdf(arxiv_id, self.pdf_folder_path)
+            #result.download_pdf(dirpath = self.pdf_folder_path, filename=f"{arxiv_id}.pdf")
+            success = download_paper(
+                result=result,
+                save_path=self.pdf_folder_path,
+                filename=f"{arxiv_id}.pdf"
+            )
+            if not success:
+                print(f"❌ 论文 {result.title} 下载最终失败")
+
             print(5)
 
             self.docs.append(add_doc)
@@ -361,7 +376,7 @@ class ArxivPDFExtractor():
             path = doc.pdf_path
             print("getting markdown...")
             markdown_path = get_pdf_md(path,self.pdf_folder_path,doc.doc_id)
-            print("done")
+            print("done, begin chunking")
             if markdown_path:
                 doc.figure_chunks = self.pdf_images_chunk(markdown_path,self.image_folder_path,doc.doc_id)
                 doc.table_chunks = self.pdf_tables_chunk(markdown_path)
@@ -523,46 +538,189 @@ class ArxivPDFExtractor():
 
 ############################################################### Some Tools ####################################################################
 
-
-def download_arxiv_pdf(arxiv_id: str, save_path):
-    "已弃用"
+def compress_pdf(input_path: str, output_path: str = None, max_size_mb: int = 8) -> str:
     """
-    Download the PDF file on arXiv to the specified path with retry logic.
-    Parameter: arxiv_id (str): The arXiv ID of the paper, such as '2106.14834' 
-    save_path (str): Local file path to save the PDF folder
+    压缩PDF文件，如果文件大小超过指定值
+    
+    Args:
+        input_path: 输入PDF文件路径
+        output_path: 输出PDF文件路径，如果为None则覆盖原文件
+        max_size_mb: 最大文件大小（MB）
+    
+    Returns:
+        str: 压缩后的文件路径，如果压缩失败则返回原文件路径
     """
-    max_retries = 5
-    retry_count = 0
-    url = f'https://arxiv.org/pdf/{arxiv_id}.pdf'
+    if output_path is None:
+        output_path = input_path
+    
+    # 检查文件大小
+    file_size_mb = os.path.getsize(input_path) / (1024 * 1024)
+    if file_size_mb <= max_size_mb:
+        print(f"📄 PDF 文件大小 ({file_size_mb:.2f}MB) 未超过 {max_size_mb}MB，无需压缩")
+        return input_path
+    
+    print(f"📦 PDF 文件大小 ({file_size_mb:.2f}MB) 超过 {max_size_mb}MB，开始压缩...")
+    
+    try:
+        # 使用PyPDF2进行压缩
+        reader = PdfReader(input_path)
+        writer = PdfWriter()
+        
+        # 复制所有页面
+        for page in reader.pages:
+            writer.add_page(page)
+        
+        # 设置压缩参数
+        writer.add_metadata(reader.metadata)
+        
+        # 保存压缩后的文件
+        with open(output_path, 'wb') as output_file:
+            writer.write(output_file)
+        
+        # 检查压缩效果
+        new_size_mb = os.path.getsize(output_path) / (1024 * 1024)
+        compression_ratio = (1 - new_size_mb/file_size_mb) * 100
+        
+        print(f"✅ PDF压缩完成: {file_size_mb:.2f}MB -> {new_size_mb:.2f}MB (压缩率: {compression_ratio:.1f}%)")
+        return output_path
+        
+    except Exception as e:
+        print(f"⚠️ PDF压缩失败: {str(e)}")
+        return input_path
 
-    while retry_count < max_retries:
-        try:
-            response = requests.get(url, stream=True)
-            response.raise_for_status()  # 检查HTTP响应状态码
-            file_path = os.path.join(save_path, f'{arxiv_id}.pdf')
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+def verify_pdf(file_path: str) -> bool:
+    """
+    验证PDF文件是否有效
+    
+    Args:
+        file_path: PDF文件路径
+    
+    Returns:
+        bool: 文件是否有效
+    """
+    try:
+        with open(file_path, 'rb') as f:
+            header = f.read(5)
+            if not header.startswith(b'%PDF-'):
+                print(f"❌ {file_path} 不是有效的PDF文件")
+                return False
+        return True
+    except Exception as e:
+        print(f"❌ 验证PDF文件失败 {file_path}: {str(e)}")
+        return False
 
-            with open(file_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
+def download_pdf_with_retry(url: str, save_path: str, filename: str, max_retries: int = 3) -> bool:
+    """
+    使用重试机制下载PDF文件
+    
+    Args:
+        url: PDF文件的URL
+        save_path: 保存路径
+        filename: 文件名
+        max_retries: 最大重试次数
+    
+    Returns:
+        bool: 下载是否成功
+    """
+    session = requests.Session()
+    retries = Retry(
+        total=max_retries,
+        backoff_factor=1,
+        status_forcelist=[500, 502, 503, 504]
+    )
+    session.mount('http://', HTTPAdapter(max_retries=retries))
+    session.mount('https://', HTTPAdapter(max_retries=retries))
+    
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (compatible; AIgniteBot/1.0; +https://github.com/Algnite-Solutions/AIgnite)',
+        'Accept': 'application/pdf'
+    }
+    
+    temp_path = os.path.join(save_path, f"{filename}.tmp")
+    final_path = os.path.join(save_path, filename)
+    
+    try:
+        # 确保目录存在
+        os.makedirs(save_path, exist_ok=True)
+        
+        # 下载文件
+        response = session.get(url, headers=headers, stream=True, timeout=30)
+        response.raise_for_status()
+        
+        # 获取文件大小
+        total_size = int(response.headers.get('content-length', 0))
+        
+        # 使用临时文件下载
+        with open(temp_path, 'wb') as f:
+            downloaded_size = 0
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+                    downloaded_size += len(chunk)
+        
+        # 验证文件大小
+        if total_size > 0 and downloaded_size != total_size:
+            raise ValueError(f"文件大小不匹配: 预期 {total_size} 字节，实际下载 {downloaded_size} 字节")
+        
+        # 验证PDF文件
+        with open(temp_path, 'rb') as f:
+            header = f.read(5)
+            if not header.startswith(b'%PDF-'):
+                raise ValueError("文件不是有效的PDF格式")
+        
+        # 如果验证通过，重命名临时文件
+        if os.path.exists(final_path):
+            os.remove(final_path)
+        os.rename(temp_path, final_path)
+        
+        print(f"✅ 成功下载: {filename}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ 下载失败 {filename}: {str(e)}")
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        return False
 
-            print(f"PDF successfully saved to: {file_path}")
-            return file_path
-
-        except requests.HTTPError as e:
-            error_code = response.status_code
-            print(f"Download failed (HTTP {error_code}), retrying...")
-        except Exception as e:
-            print(f"Download failed: {str(e)}, retrying...")
-
-        retry_count += 1
-        if retry_count < max_retries:
-            print(f"Retrying in 15 seconds (Attempt {retry_count}/{max_retries})")
-            time.sleep(15)  # 等待15秒后重试
-
-    print(f"Failed to download after {max_retries} attempts.")
-    return None
+def download_paper(result, save_path: str, filename: str) -> bool:
+    """
+    下载论文，先尝试使用arxiv API，如果失败则使用可靠下载方法
+    
+    Args:
+        result: arxiv搜索结果
+        save_path: 保存路径
+        filename: 文件名
+    
+    Returns:
+        bool: 下载是否成功
+    """
+    file_path = os.path.join(save_path, filename)
+    
+    # 第一步：尝试使用arxiv API下载
+    try:
+        print(f"尝试使用arxiv API下载: {filename}")
+        result.download_pdf(dirpath=save_path, filename=filename)
+        
+        # 验证下载的文件
+        if verify_pdf(file_path):
+            print(f"✅ arxiv API下载成功: {filename}")
+            return True
+        else:
+            print(f"⚠️ arxiv API下载的文件无效，尝试使用可靠下载方法...这可能需要稍微长一点的时间。")
+            if os.path.exists(file_path):
+                os.remove(file_path)
+    except Exception as e:
+        print(f"❌ arxiv API下载失败: {str(e)}")
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    
+    # 第二步：使用可靠下载方法
+    print(f"使用可靠下载方法下载: {filename}")
+    return download_pdf_with_retry(
+        url=result.pdf_url,
+        save_path=save_path,
+        filename=filename
+    )
 
 def get_img_from_url(arxivid,img_src):
     time.sleep(1)
@@ -591,14 +749,31 @@ def get_img_from_url(arxivid,img_src):
 def get_pdf_md(path,store_path,name):
     visual_service = VisualService()
     # call below method if you dont set ak and sk in $HOME/.volc/config
-    attention ！
+    attention!
     visual_service.set_ak('')
     visual_service.set_sk('')
 
     params = dict()
 
+    # 使用 with 语句确保文件正确关闭
+    with open(str(path), 'rb') as f:
+        pdf_content = f.read()
+
+    if os.path.getsize(path) > 8*1024*1024:
+        print(f"📦 PDF 超过 8MB，需要压缩。")
+        try:
+            compressed_path = compress_pdf(path)
+            print(f"✅ PDF压缩完成，使用压缩后的文件")
+            path = compressed_path
+            with open(str(path), 'rb') as f:
+                pdf_content = f.read()
+        except Exception as e:
+            print(f"⚠️ 压缩失败：{e}")
+            return None
+    
+    
     form = {
-        "image_base64":  base64.b64encode(open(str(path),'rb').read()).decode(),   # 文件binary 图片/PDF 
+        "image_base64": base64.b64encode(pdf_content).decode(),   # 文件binary 图片/PDF 
         "image_url": "",                  # url
         "version": "v3",                  # 版本
         "page_start": 0,                  # 起始页数
@@ -607,30 +782,17 @@ def get_pdf_md(path,store_path,name):
         "filter_header": "true"           # 过滤页眉页脚水印
     }
 
-    if os.path.getsize(path) > 8*1024*1024:
-        print(f"📦 PDF 超过 8MB，需要压缩。")
-        try:
-            compressPdfDocument = ap.Document(path)  # 需要压缩的pdf文件路径
-            pdfoptimizeOptions = ap.optimization.OptimizationOptions()
-            pdfoptimizeOptions.image_compression_options.compress_images = True
-            pdfoptimizeOptions.image_compression_options.image_quality = 90
-            compressPdfDocument.optimize_resources(pdfoptimizeOptions)
-            compressPdfDocument.save(path)  # 需要压缩后保存的文件路径
-        except Exception as e:
-            print(f"⚠️ 压缩失败：{e}")
-            return None
-
     # 请求
     try:
         resp = visual_service.ocr_pdf(form)
-    except Exception as e:
-        print("Visual OCR error:", str(e))
-        raise
-    file_path = None
-
-    if resp["data"]:
-        markdown = resp["data"]["markdown"] # markdown 字符串
-        #json_data = resp["data"]["detail"] # json格式详细信息
+        if not resp or "data" not in resp:
+            print("❌ OCR请求失败：响应格式不正确")
+            return None
+            
+        markdown = resp["data"].get("markdown")
+        if not markdown:
+            print("❌ OCR请求失败：未获取到markdown内容")
+            return None
 
         # 确保目录存在
         os.makedirs(store_path, exist_ok=True)
@@ -638,15 +800,14 @@ def get_pdf_md(path,store_path,name):
         file_path = os.path.join(store_path, f"{name}.md")
 
         # 写入文件
-        with open(file_path, "w") as f:
-            f.writelines(markdown)
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(markdown)
 
-        #json_data = json.loads(json_data)
+        return file_path
 
-    else:
-        print("request error")
-
-    return file_path
+    except Exception as e:
+        print(f"❌ OCR请求失败：{str(e)}")
+        return None
 
 def get_Gemini_response(api_key,file_path,prompt):
 
@@ -752,8 +913,9 @@ if __name__ == '__main__':
     #extractor = ArxivHTMLExtractor(html_text_folder,pdf_folder,arxiv_pool,image_folder_path,json_path)
     #extractor.extract_all_htmls()
     extractor2 = ArxivPDFExtractor(None, pdf_folder, image_folder_path, arxiv_pool, json_path)
-    extractor2.extract_all()
+    #extractor2.extract_all()
+    #extractor2.init_docset()
     #extractor2.pdf_text_chunk('/data3/peirongcan/paperIgnite/AIgnite/test/pdfs/2505.15817v1.md') 
     #extractor.extract_all_htmls()
     #download_images_from_markdown("/data3/peirongcan/paperIgnite/AIgnite/test/pdfs/2505.13959v1.md", "/data3/peirongcan/paperIgnite/AIgnite/test/imgs")
-    #get_pdf_md("/data3/peirongcan/paperIgnite/AIgnite/test/pdfs/2505.17021v1.pdf",'/data3/peirongcan/paperIgnite/AIgnite/test/pdfs',"tem")
+    #get_pdf_md("/data3/peirongcan/paperIgnite/AIgnite/test/pdfs/2504.20024v1.pdf",'/data3/peirongcan/paperIgnite/AIgnite/test/pdfs',"tem")
