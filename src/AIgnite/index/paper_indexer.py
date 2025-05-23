@@ -13,38 +13,19 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
 class PaperIndexer(BaseIndexer):
-    def __init__(self, model_name: str = 'BAAI/bge-base-en-v1.5',
-                 minio_endpoint: str = "localhost:9000",
-                 minio_access_key: str = "ThU32qXfQZHUeGokfpwB",
-                 minio_secret_key: str = "XP2GEnl4udzzv7Xp3DW5Y04oc71ndxxoWqKuAmMR",
-                 minio_bucket: str = "aignite-papers",
-                 db_url: str = None):
-        """Initialize the paper indexer with all required databases.
+    def __init__(self, vector_db: VectorDB, metadata_db: MetadataDB, image_db: MinioImageDB):
+        """Initialize the paper indexer with pre-initialized database instances.
         
         Args:
-            model_name: Name of the embedding model to use
-            minio_endpoint: MinIO server endpoint
-            minio_access_key: MinIO access key
-            minio_secret_key: MinIO secret key
-            minio_bucket: MinIO bucket name
-            db_url: PostgreSQL connection URL (optional)
+            vector_db: Initialized VectorDB instance for text embeddings
+            metadata_db: Initialized MetadataDB instance for paper metadata
+            image_db: Initialized MinioImageDB instance for storing figures
         """
-        logger.debug(f"Initializing PaperIndexer with db_url: {db_url}")
+        logger.debug("Initializing PaperIndexer with pre-initialized databases")
         
-        # Initialize vector database for text embeddings
-        self.vector_db = VectorDB(model_name=model_name)
-        
-        # Initialize metadata database for paper metadata and relationships
-        self.metadata_db = MetadataDB(db_path=db_url)
-        
-        # Initialize image database for storing figures
-        self.image_db = MinioImageDB(
-            endpoint=minio_endpoint,
-            access_key=minio_access_key,
-            secret_key=minio_secret_key,
-            bucket_name=minio_bucket,
-            secure=False
-        )
+        self.vector_db = vector_db
+        self.metadata_db = metadata_db
+        self.image_db = image_db
 
     def __del__(self):
         """Cleanup method."""

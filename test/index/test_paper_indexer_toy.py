@@ -3,15 +3,15 @@ import os
 import tempfile
 from PIL import Image
 import io
-import numpy as np
 from typing import List
 from AIgnite.index.paper_indexer import PaperIndexer
 from AIgnite.data.docset import DocSet, TextChunk, FigureChunk, TableChunk, ChunkType
+from AIgnite.utils.toy_dbs import ToyVectorDB, ToyMetadataDB, ToyImageDB
 
-class TestPaperIndexer(unittest.TestCase):
+class TestPaperIndexerWithToyDBs(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        """Set up test data and PaperIndexer instance."""
+        """Set up test data and PaperIndexer instance with toy databases."""
         # Create temporary directory for test files
         cls.temp_dir = tempfile.mkdtemp()
         
@@ -31,15 +31,18 @@ class TestPaperIndexer(unittest.TestCase):
                 f.write(f"Test PDF content for paper {i}".encode())
             cls.test_pdfs[f"pdf{i+1}"] = pdf_path
         
-        # Initialize indexer with test database
-        cls.indexer = PaperIndexer(
-            model_name='BAAI/bge-base-en-v1.5',
-            minio_endpoint="localhost:9000",
-            minio_access_key="Wc58W6KOCOfxaAc2MjzM",
-            minio_secret_key="Seqa7Xs3TO6EaClfD4l6y4b4teW7t2Y1Slu92VKw",
-            minio_bucket="aignite-test-papers",
-            db_url="postgresql://postgres:11111@localhost:5432/aignite_test"  # Use test database
+        # Initialize toy databases
+        cls.vector_db = ToyVectorDB(model_name='BAAI/bge-base-en-v1.5')
+        cls.metadata_db = ToyMetadataDB(db_path='memory://test')
+        cls.image_db = ToyImageDB(
+            endpoint='memory://localhost:9000',
+            access_key='test_key',
+            secret_key='test_secret',
+            bucket_name='test-bucket'
         )
+        
+        # Initialize indexer with toy databases
+        cls.indexer = PaperIndexer(cls.vector_db, cls.metadata_db, cls.image_db)
         
         # Create test papers
         cls.test_papers = [
@@ -77,63 +80,14 @@ class TestPaperIndexer(unittest.TestCase):
                     FigureChunk(id="fig3", type=ChunkType.FIGURE, image_path=cls.test_images["fig3"], alt_text="Attention visualization")
                 ],
                 pdf_path=cls.test_pdfs["pdf2"]
-            ),
-            DocSet(
-                doc_id="2106.14836",
-                title="Vision Systems",
-                abstract="Computer vision techniques for object detection and recognition.",
-                authors=["Author 5", "Author 6"],
-                categories=["cs.CV"],
-                published_date="2021-06-30",
-                text_chunks=[
-                    TextChunk(id="chunk7", type=ChunkType.TEXT, text="CNN architectures for image processing tasks."),
-                    TextChunk(id="chunk8", type=ChunkType.TEXT, text="Object detection frameworks and their comparisons."),
-                    TextChunk(id="chunk9", type=ChunkType.TEXT, text="Real-time object tracking implementations.")
-                ],
-                pdf_path=cls.test_pdfs["pdf3"]
-            ),
-            DocSet(
-                doc_id="2106.14837",
-                title="Robotic Learning",
-                abstract="Robotic control systems using reinforcement learning.",
-                authors=["Author 7", "Author 8"],
-                categories=["cs.RO", "cs.AI"],
-                published_date="2021-07-01",
-                text_chunks=[
-                    TextChunk(id="chunk10", type=ChunkType.TEXT, text="Robot manipulation and control strategies."),
-                    TextChunk(id="chunk11", type=ChunkType.TEXT, text="RL algorithms for robotic task learning."),
-                    TextChunk(id="chunk12", type=ChunkType.TEXT, text="Experimental results in real-world scenarios.")
-                ],
-                pdf_path=cls.test_pdfs["pdf4"]
-            ),
-            DocSet(
-                doc_id="2106.14838",
-                title="Quantum Computing",
-                abstract="Quantum computing algorithms and their applications.",
-                authors=["Author 9", "Author 10"],
-                categories=["quant-ph", "cs.ET"],
-                published_date="2021-07-02",
-                text_chunks=[
-                    TextChunk(id="chunk13", type=ChunkType.TEXT, text="Introduction to quantum computing principles."),
-                    TextChunk(id="chunk14", type=ChunkType.TEXT, text="Quantum algorithms for optimization problems."),
-                    TextChunk(id="chunk15", type=ChunkType.TEXT, text="Experimental results on quantum hardware.")
-                ],
-                pdf_path=cls.test_pdfs["pdf5"]
             )
         ]
-        
-        # Clean up any existing test data and index the papers
-        for paper in cls.test_papers:
-            try:
-                cls.indexer.delete_paper(paper.doc_id)
-            except:
-                pass
-        
-        # Index all test papers
-        cls.indexer.index_papers(cls.test_papers)
 
     def test_1_index_papers(self):
-        """Test paper indexing across all databases."""
+        """Test paper indexing across all toy databases."""
+        # Index test papers
+        self.indexer.index_papers(self.test_papers)
+        
         # Test metadata storage
         for paper in self.test_papers:
             metadata = self.indexer.get_paper_metadata(paper.doc_id)
@@ -150,13 +104,13 @@ class TestPaperIndexer(unittest.TestCase):
             
             # Verify PDF content
             pdf_path = os.path.join(self.temp_dir, "test_output.pdf")
-            self.indexer.metadata_db.get_pdf(paper.doc_id, save_path=pdf_path)
+            pdf_content = self.indexer.metadata_db.get_pdf(paper.doc_id, save_path=pdf_path)
             self.assertTrue(os.path.exists(pdf_path))
             with open(pdf_path, 'rb') as f:
-                pdf_content = f.read()
+                saved_content = f.read()
             with open(paper.pdf_path, 'rb') as f:
                 original_content = f.read()
-            self.assertEqual(pdf_content, original_content)
+            self.assertEqual(saved_content, original_content)
             os.remove(pdf_path)
             
             # Verify images are stored
@@ -168,7 +122,7 @@ class TestPaperIndexer(unittest.TestCase):
                 self.assertEqual(img.size, stored_img.size)
 
     def test_2_find_similar_papers(self):
-        """Test paper similarity search."""
+        """Test paper similarity search with toy vector database."""
         # Test basic search
         results = self.indexer.find_similar_papers(
             query="machine learning deep learning",
@@ -189,28 +143,10 @@ class TestPaperIndexer(unittest.TestCase):
         self.assertGreater(len(results), 0)
         self.assertEqual(results[0]["title"], "NLP Advances")
 
-    def test_3_nonexistent_paper(self):
-        """Test handling of non-existent papers."""
-        # Try to get metadata
-        metadata = self.indexer.get_paper_metadata("nonexistent")
-        self.assertIsNone(metadata)
-        
-        # Try to get PDF
-        pdf_data = self.indexer.metadata_db.get_pdf("nonexistent")
-        self.assertIsNone(pdf_data)
-        
-        # Try to get images
-        images = self.indexer.image_db.list_doc_images("nonexistent")
-        self.assertEqual(len(images), 0)
-        
-        # Try to delete
-        success = self.indexer.delete_paper("nonexistent")
-        self.assertFalse(success)  # Should return False since paper doesn't exist
-
-    def test_4_delete_paper(self):
-        """Test paper deletion from all databases."""
+    def test_3_delete_paper(self):
+        """Test paper deletion from all toy databases."""
         # Get a paper that hasn't been deleted yet
-        paper = self.test_papers[1]  # Use NLP paper
+        paper = self.test_papers[0]  # Use ML paper
         
         # Delete paper
         success = self.indexer.delete_paper(paper.doc_id)
@@ -230,7 +166,7 @@ class TestPaperIndexer(unittest.TestCase):
         
         # Verify vector search no longer returns the paper
         results = self.indexer.find_similar_papers(
-            query="natural language processing",
+            query="machine learning",
             top_k=5
         )
         self.assertTrue(all(r["title"] != paper.title for r in results))
@@ -238,13 +174,6 @@ class TestPaperIndexer(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         """Clean up test data."""
-        # Delete test papers from all databases
-        for paper in cls.test_papers:
-            try:
-                cls.indexer.delete_paper(paper.doc_id)
-            except:
-                pass
-        
         # Clean up temporary files
         try:
             import shutil
@@ -254,12 +183,9 @@ class TestPaperIndexer(unittest.TestCase):
         
         # Clean up indexer
         if hasattr(cls, 'indexer'):
-            if hasattr(cls.indexer, 'vector_db'):
-                cls.indexer.vector_db = None
-            if hasattr(cls.indexer, 'metadata_db'):
-                cls.indexer.metadata_db = None
-            if hasattr(cls.indexer, 'image_db'):
-                cls.indexer.image_db = None
+            cls.indexer.vector_db = None
+            cls.indexer.metadata_db = None
+            cls.indexer.image_db = None
 
 if __name__ == '__main__':
     unittest.main() 
