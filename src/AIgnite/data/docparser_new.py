@@ -23,7 +23,6 @@ from urllib3.util.retry import Retry
 import base64
 from volcengine.visual.VisualService import VisualService
 import json
-import fitz 
 import aspose.pdf as ap
 from PyPDF2 import PdfReader, PdfWriter
 import img2pdf
