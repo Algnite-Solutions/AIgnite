@@ -71,8 +71,8 @@ class ArxivHTMLExtractor():
         yesterday_str = yesterday.strftime("%Y%m%d") + exact_time
 
         #using the format of arxiv api
-        #query = "cat:cs.* AND submittedDate:[" + yesterday_str + " TO " + today_str + "]"
-        query = "cat:cs.* AND submittedDate:[202505210600 TO 202505220600]"
+        query = "cat:cs.* AND submittedDate:[" + yesterday_str + " TO " + today_str + "]"
+        #query = "cat:cs.* AND submittedDate:[202505210600 TO 202505220600]"
 
         search = arxiv.Search(
             query=query,
@@ -330,13 +330,13 @@ class ArxivPDFExtractor():
         today_str = self.date.strftime("%Y%m%d") + exact_time
         yesterday_str = yesterday.strftime("%Y%m%d") + exact_time
         print(today_str)
-        #query = "cat:cs.* AND submittedDate:[" + yesterday_str + " TO " + today_str + "]"
-        query = "cat:cs.* AND submittedDate:[202504250900 TO 202504260600]"
+        query = "cat:cs.* AND submittedDate:[" + yesterday_str + " TO " + today_str + "]"
+        #query = "cat:cs.* AND submittedDate:[202504250900 TO 202504260600]"
         print(today_str,yesterday_str)
 
         search = arxiv.Search(
             query=query,
-            max_results=10,  # You can set max papers you want here
+            max_results=50,  # You can set max papers you want here
             sort_by=arxiv.SortCriterion.SubmittedDate
         )
 
