@@ -31,8 +31,11 @@ class TestArxivHTMLExtractor(unittest.TestCase):
         self.extractor2 = ArxivPDFExtractor(None, self.pdf_folder_path, self.image_folder_path, self.arxiv_pool_path, self.json_output_path)
 
     def test_end_to_end_extraction(self):
-        #self.extractor.extract_all_htmls()
-        self.extractor2.extract_all()
+
+        #choose which way to extract here.
+        self.extractor.extract_all_htmls()
+        #self.extractor2.extract_all()
+
         files = os.listdir(self.json_output_path)
         self.assertTrue(len(files) > 0, "No JSON output found.")
 

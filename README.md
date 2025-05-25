@@ -19,4 +19,5 @@ We use docker to quicky deploy the package on cloud instances.
 docker build -t aignite:latest .
 docker run -it --rm aignite
 ```
-现在遇到了一被arxiv限制速率的问题，正在改进中。。。
+You can set a proxy to accelerate the downloading.
+Before use XXXparser.py, please set your key in the docparser_new.py/get_pdf_md()

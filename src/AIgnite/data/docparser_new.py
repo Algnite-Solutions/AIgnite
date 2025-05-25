@@ -30,7 +30,8 @@ import img2pdf
 from PIL import Image
 import io
 import tempfile
-
+from spire.pdf.common import *
+from spire.pdf import *
 
 class ArxivHTMLExtractor():
     """
@@ -71,12 +72,12 @@ class ArxivHTMLExtractor():
         yesterday_str = yesterday.strftime("%Y%m%d") + exact_time
 
         #using the format of arxiv api
-        query = "cat:cs.* AND submittedDate:[" + yesterday_str + " TO " + today_str + "]"
-        #query = "cat:cs.* AND submittedDate:[202504190600 TO 202504200600]"
+        #query = "cat:cs.* AND submittedDate:[" + yesterday_str + " TO " + today_str + "]"
+        query = "cat:cs.* AND submittedDate:[202505210600 TO 202505220600]"
 
         search = arxiv.Search(
             query=query,
-            max_results=3,  # You can set max papers you want here
+            max_results=50,  # You can set max papers you want here
             sort_by=arxiv.SortCriterion.SubmittedDate
         )
 
@@ -84,14 +85,19 @@ class ArxivHTMLExtractor():
         #print(f"grabbing arXiv papers in cs.* submitted from 202504190600 to 202504200600......")
 
         # Test if we have extracted already or not. Download pdf and try to download html
-        for result in client.results(search):
-            time.sleep(15)
+
+        tem = client.results(search)
+        tem = list(tem)
+        print("successful search!")
+
+        for result in tem:
             html_url = result.pdf_url.replace("pdf", "html")
             arxiv_id = html_url.split('/')[-1]
             with open(self.arxiv_pool, "r", encoding="utf-8") as f:
                 if arxiv_id in f.read():
                     print(f"{arxiv_id} is already extracted before!")
                     continue
+            print(1)
             try:
                 #add basic info
                 add_doc = DocSet(
@@ -101,10 +107,20 @@ class ArxivHTMLExtractor():
                 categories=result.categories,
                 published_date=str(result.published),
                 abstract=result.summary,
-                #pdf_path=download_arxiv_pdf(arxiv_id, self.pdf_folder_path),
+                pdf_path=str(os.path.join(self.pdf_folder_path, f'{arxiv_id}.pdf')),
                 #Set htmlpath to None first and update it later
                 HTML_path=None 
             )
+                print(2)
+
+                success = download_paper(
+                    result=result,
+                    save_path=self.pdf_folder_path,
+                    filename=f"{arxiv_id}.pdf"
+                )
+                if not success:
+                    add_doc.pdf_path = None
+                    print(f"❌ 论文 {result.title} 下载最终失败")
 
                 response = requests.get(html_url)
                 response.raise_for_status()
@@ -121,13 +137,12 @@ class ArxivHTMLExtractor():
                 else:
                     print(f"can not get {arxiv_id}'s html")
                     add_doc.HTML_path = None
+                
 
                 self.docs.append(add_doc)
             except Exception as e:
                 self.docs.append(add_doc)
                 print(f"request failed: {e}, DocSet will not include this HTML.")
-
-        self.serialize_docs_init()
 
 
     def extract_text(self, soup: BeautifulSoup):
@@ -244,6 +259,8 @@ class ArxivHTMLExtractor():
         """
         self.init_docset()
 
+        print("Init over. Now begin chunking...")
+
         for filename in os.listdir(self.html_text_folder):
             if filename.endswith(".html"):
                 file_path = os.path.join(self.html_text_folder, filename)
@@ -314,8 +331,8 @@ class ArxivPDFExtractor():
         today_str = self.date.strftime("%Y%m%d") + exact_time
         yesterday_str = yesterday.strftime("%Y%m%d") + exact_time
         print(today_str)
-        query = "cat:cs.* AND submittedDate:[" + yesterday_str + " TO " + today_str + "]"
-        #query = "cat:cs.* AND submittedDate:[202504190900 TO 202504200600]"
+        #query = "cat:cs.* AND submittedDate:[" + yesterday_str + " TO " + today_str + "]"
+        query = "cat:cs.* AND submittedDate:[202504250900 TO 202504260600]"
         print(today_str,yesterday_str)
 
         search = arxiv.Search(
@@ -388,17 +405,17 @@ class ArxivPDFExtractor():
         Help HTMLExtractor. We don't use it in the process of PDF's extractor
         """
         for doc in self.docs:
-            if doc.HTML_path == None:
-                self.pdf_paths.append(str(Path(self.pdf_folder_path) / f"{doc.doc_id}.pdf"))
-                print(self.pdf_paths)
-
-                for path in self.pdf_paths:
-                    print("getting markdown...")
-                    markdown_path = get_pdf_md(path,self.pdf_folder_path,doc.doc_id)
-                    print("done")
+            if doc.HTML_path == None and doc.pdf_path is not None:
+                path = doc.pdf_path
+                print("getting markdown...")
+                markdown_path = get_pdf_md(path,self.pdf_folder_path,doc.doc_id)
+                print("done, begin chunking")
+                if markdown_path:
                     doc.figure_chunks = self.pdf_images_chunk(markdown_path,self.image_folder_path,doc.doc_id)
                     doc.table_chunks = self.pdf_tables_chunk(markdown_path)
                     doc.text_chunks = self.pdf_text_chunk(markdown_path)#一定在最后
+            elif doc.pdf_path == None:
+                print("Neither PDF or HTML is avaliable.")
                    
     def pdf_images_chunk(self, markdown_path, image_folder_path, doc_id):
         figures = []
@@ -537,7 +554,7 @@ class ArxivPDFExtractor():
                 f.write(json_str)
 
 ############################################################### Some Tools ####################################################################
-
+    
 def compress_pdf(input_path: str, output_path: str = None, max_size_mb: int = 8) -> str:
     """
     压缩PDF文件，如果文件大小超过指定值
@@ -562,28 +579,31 @@ def compress_pdf(input_path: str, output_path: str = None, max_size_mb: int = 8)
     print(f"📦 PDF 文件大小 ({file_size_mb:.2f}MB) 超过 {max_size_mb}MB，开始压缩...")
     
     try:
-        # 使用PyPDF2进行压缩
-        reader = PdfReader(input_path)
-        writer = PdfWriter()
-        
-        # 复制所有页面
-        for page in reader.pages:
-            writer.add_page(page)
-        
-        # 设置压缩参数
-        writer.add_metadata(reader.metadata)
-        
-        # 保存压缩后的文件
-        with open(output_path, 'wb') as output_file:
-            writer.write(output_file)
-        
-        # 检查压缩效果
+        # 创建PdfCompressor对象并传入PDF文件
+        compressor = PdfCompressor(input_path)
+
+        # 获取OptimizationOptions对象
+        options = compressor.OptimizationOptions
+
+        # 压缩字体
+        options.SetIsCompressFonts(True)
+        # 取消字体嵌入
+        # options.SetIsUnembedFonts(True)
+
+        # 设置图片质量
+        options.SetImageQuality(ImageQuality.Medium)
+        # 调整图片大小
+        options.SetResizeImages(True)
+        # 压缩图片
+        options.SetIsCompressImage(True)
+
+        # 压缩PDF文件并保存
+        compressor.CompressToFile(output_path)
         new_size_mb = os.path.getsize(output_path) / (1024 * 1024)
         compression_ratio = (1 - new_size_mb/file_size_mb) * 100
         
         print(f"✅ PDF压缩完成: {file_size_mb:.2f}MB -> {new_size_mb:.2f}MB (压缩率: {compression_ratio:.1f}%)")
         return output_path
-        
     except Exception as e:
         print(f"⚠️ PDF压缩失败: {str(e)}")
         return input_path
@@ -749,7 +769,7 @@ def get_img_from_url(arxivid,img_src):
 def get_pdf_md(path,store_path,name):
     visual_service = VisualService()
     # call below method if you dont set ak and sk in $HOME/.volc/config
-    attention!
+    after put your ak and sk you can delete this sentence.
     visual_service.set_ak('')
     visual_service.set_sk('')
 
@@ -758,7 +778,7 @@ def get_pdf_md(path,store_path,name):
     # 使用 with 语句确保文件正确关闭
     with open(str(path), 'rb') as f:
         pdf_content = f.read()
-
+        
     if os.path.getsize(path) > 8*1024*1024:
         print(f"📦 PDF 超过 8MB，需要压缩。")
         try:
@@ -770,7 +790,6 @@ def get_pdf_md(path,store_path,name):
         except Exception as e:
             print(f"⚠️ 压缩失败：{e}")
             return None
-    
     
     form = {
         "image_base64": base64.b64encode(pdf_content).decode(),   # 文件binary 图片/PDF 
@@ -901,21 +920,3 @@ def _download_single_image(name: str, url: str, save_dir: str) -> bool:
         print(f"❌ 下载失败 {url}：{str(e)}")
         return False
 
-
-if __name__ == '__main__':
-    os.environ['http proxy']="http://127.0.0.1:7890"
-    os.environ['https proxy']="http://127.0.0.1:7890"
-    html_text_folder = "/data3/peirongcan/paperIgnite/AIgnite/test/htmls"
-    pdf_folder = "/data3/peirongcan/paperIgnite/AIgnite/test/pdfs"
-    arxiv_pool = "/data3/peirongcan/paperIgnite/AIgnite/test/html_url_storage/html_urls.txt"
-    image_folder_path = "/data3/peirongcan/paperIgnite/AIgnite/test/imgs"
-    json_path = "/data3/peirongcan/paperIgnite/AIgnite/test/jsons"
-    #extractor = ArxivHTMLExtractor(html_text_folder,pdf_folder,arxiv_pool,image_folder_path,json_path)
-    #extractor.extract_all_htmls()
-    extractor2 = ArxivPDFExtractor(None, pdf_folder, image_folder_path, arxiv_pool, json_path)
-    #extractor2.extract_all()
-    #extractor2.init_docset()
-    #extractor2.pdf_text_chunk('/data3/peirongcan/paperIgnite/AIgnite/test/pdfs/2505.15817v1.md') 
-    #extractor.extract_all_htmls()
-    #download_images_from_markdown("/data3/peirongcan/paperIgnite/AIgnite/test/pdfs/2505.13959v1.md", "/data3/peirongcan/paperIgnite/AIgnite/test/imgs")
-    #get_pdf_md("/data3/peirongcan/paperIgnite/AIgnite/test/pdfs/2504.20024v1.pdf",'/data3/peirongcan/paperIgnite/AIgnite/test/pdfs',"tem")
