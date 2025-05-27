@@ -15,4 +15,11 @@ urllib3
 fastapi==0.115.12
 uvicorn==0.34.2
 starlette==0.46.2
-google-genai
+google-genai                             
+google-generativeai    
+volcengine          
+aspose-pdf           
+PyPDF2           
+img2pdf                  
+Pillow          
+Spire.Pdf             
