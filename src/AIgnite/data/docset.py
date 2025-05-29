@@ -24,7 +24,7 @@ class TextChunk(BaseChunk):
 
 class FigureChunk(BaseChunk):
     type: Literal[ChunkType.FIGURE]
-    image_path: str  # e.g. local path, S3 url
+    image_path: str | None  # e.g. local path, S3 url
     alt_text: Optional[str] = None
 
 
