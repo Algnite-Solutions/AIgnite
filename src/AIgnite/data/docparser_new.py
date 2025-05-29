@@ -1,6 +1,5 @@
 from bs4 import BeautifulSoup
 from .docset import DocSet, TextChunk, FigureChunk, TableChunk, ChunkType
-from uuid import uuid4
 from pathlib import Path
 #new
 from datetime import datetime, timezone, timedelta
@@ -20,18 +19,9 @@ from spire.pdf.common import *
 from spire.pdf import *
 from abc import ABC, abstractmethod
 
-'''
-TODO:
-1.把test_docparser_new 分成两个函数 test_arxivpdfextrator.py和test_arxivhtmlextractor.py
-2.实际应用中是不是应该考虑抓取所有的文章？换句话说我们怎么这点 有类似-1（全部抓取的参数吗
-
-*.可以考虑去并发（try
-*.压缩方式进一步改进
-'''
-
 class BaseHTMLExtractor(ABC):
-    """HTML提取器的抽象基类"""
-    def __init__(self, html_text_folder, pdf_folder_path, arxiv_pool, image_folder_path, json_path, volcengine_ak, volcengine_sk):
+    """Abstract base classes of the HTML extractor"""
+    def __init__(self, html_text_folder, pdf_folder_path, arxiv_pool, image_folder_path, json_path, volcengine_ak, volcengine_sk, start_time, end_time):
         '''
         Args:
         html_text_folder: the folder path used to store the .html file.
@@ -39,6 +29,10 @@ class BaseHTMLExtractor(ABC):
         arxiv_pool: path of a .txt file to store the arxiv_id which is serialized successfully
         image_folder_path:  the folder path used to store the .png file.
         json_path: the folder path used to store the .json file.
+        volcengine_ak: get from https://console.volcengine.com/ai/ability/info/72
+        volcengine_sk: get from https://console.volcengine.com/ai/ability/info/72
+        start_time: the earliest paper you want
+        end_time: the last paper you want
         '''
         self.date = datetime.now(timezone.utc).date()
         self.docs = []
@@ -47,43 +41,48 @@ class BaseHTMLExtractor(ABC):
         self.arxiv_pool = arxiv_pool
         self.image_folder_path = image_folder_path
         self.json_path = json_path
+        self.start_time = start_time
+        self.end_time = end_time
         #Helper
-        self.pdf_parser_helper = ArxivPDFExtractor(self.docs, pdf_folder_path, image_folder_path, arxiv_pool, json_path, volcengine_ak, volcengine_sk)
+        self.pdf_parser_helper = ArxivPDFExtractor(self.docs, pdf_folder_path, image_folder_path, arxiv_pool, json_path, volcengine_ak, volcengine_sk, start_time, end_time)
 
     @abstractmethod
     def extract_all_htmls(self) -> DocSet:
-        """执行完整的提取流程"""
+        """Carry out the complete extraction process"""
         pass
 
     @abstractmethod
     def init_docset(self):
-        """初始化文档元数据"""
+        """Initialize the document metadata"""
         pass
 
     @abstractmethod
     def serialize_docs(self):
-        """将提取结果序列化为JSON"""
+        """Serialize the extraction results into JSON"""
         pass
 
     @abstractmethod
     def extract_text(self, soup):
-        """从HTML中提取文本块"""
+        """Extract text chunks from HTML"""
         pass
 
     @abstractmethod
     def extract_figures_to_folder(self, soup, img_path, arxivid):
-        """从HTML中提取图片并保存到文件夹"""
+        """Extract images from HTML and save them to a folder"""
         pass
 
     @abstractmethod
     def extract_tables(self, soup, arxivid):
-        """从HTML中提取表格"""
+        """Extract the table from HTML"""
         pass
 
 class BasePDFExtractor(ABC):
-    """PDF提取器的抽象基类"""
+    """Abstract base classes of the PDF extractor"""
 
-    def __init__(self, docs, pdf_folder_path, image_folder_path, arxiv_pool, json_path, volcengine_ak, volcengine_sk):
+    def __init__(self, docs, pdf_folder_path, image_folder_path, arxiv_pool, json_path, volcengine_ak, volcengine_sk, start_time, end_time):
+        """
+        the same as HTMLextractor.
+        """
         if docs is None:
             self.docs = []
         else:
@@ -96,40 +95,42 @@ class BasePDFExtractor(ABC):
         self.date = datetime.now(timezone.utc).date()
         self.ak = volcengine_ak
         self.sk = volcengine_sk
+        self.start_time = start_time
+        self.end_time = end_time
 
     @abstractmethod
     def extract_all(self):
-        """执行完整的提取流程"""
+        """Carry out the complete extraction process"""
         pass
 
     @abstractmethod
     def remain_docparser(self):
-        """为HTMLparser提供帮助"""
+        """provide help for HTMLparser"""
         pass
 
     @abstractmethod
     def init_docset(self):
-        """初始化文档元数据"""
+        """Initialize the document metadata"""
         pass
 
     @abstractmethod
     def serialize_docs(self):
-        """将提取结果序列化为JSON"""
+        """Serialize the extraction results into JSON"""
         pass
 
     @abstractmethod
     def pdf_text_chunk(self, markdown_path):
-        """从PDF转换的Markdown中提取文本块"""
+        """Extract the text chunk from Markdown produced by PDF"""
         pass
 
     @abstractmethod
     def pdf_images_chunk(self, markdown_path, image_folder_path, doc_id):
-        """从PDF转换的Markdown中提取图片"""
+        """Extract the img chunk from Markdown produced by PDF"""
         pass
 
     @abstractmethod
     def pdf_tables_chunk(self, markdown_path):
-        """从PDF转换的Markdown中提取表格"""
+        """Extract the table chunk from Markdown produced by PDF"""
         pass
 
 class ArxivHTMLExtractor(BaseHTMLExtractor):
@@ -144,15 +145,8 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
         The 3 types of chunk remain to add
         """
         client = arxiv.Client()
-        one_day = timedelta(days=1)
-        yesterday = self.date - one_day
-        exact_time = "0600"
-        today_str = self.date.strftime("%Y%m%d") + exact_time
-        yesterday_str = yesterday.strftime("%Y%m%d") + exact_time
 
-        #using the format of arxiv api
-        #query = "cat:cs.* AND submittedDate:[" + yesterday_str + " TO " + today_str + "]"
-        query = "cat:cs.* AND submittedDate:[202505211000 TO 202505211100]"
+        query = "cat:cs.* AND submittedDate:[" + self.start_time + " TO " + self.end_time + "]"
 
         search = arxiv.Search(
             query=query,
@@ -160,7 +154,7 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
             sort_by=arxiv.SortCriterion.SubmittedDate
         )
 
-        print(f"grabbing arXiv papers in cs.* submitted from {yesterday} to {self.date}......")
+        print(f"grabbing arXiv papers in cs.* submitted from {self.start_time} to {self.end_time}......")
 
         # Test if we have extracted already or not. Download pdf and try to download html
         tem = client.results(search)
@@ -375,28 +369,23 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
                 f.write(json_str)
 
 class ArxivPDFExtractor(BasePDFExtractor):
-
+    """
+    A class used to extract information from daily arXiv PDFs and serialize it into JSON files.
+    """
     def init_docset(self):
+        """
+        Initialize the docset with papers' some metadata:
+        doc_id, title, authors, categories, published_date, abstract, pdf_path, HTML_path
+        The 3 types of chunk remain to add
+        """
         client = arxiv.Client()
-        one_day = timedelta(days=1)
-        yesterday = self.date - one_day
-
-        exact_time = "0600"
-        today_str = self.date.strftime("%Y%m%d") + exact_time
-        yesterday_str = yesterday.strftime("%Y%m%d") + exact_time
-        print(today_str)
-        query = "cat:cs.* AND submittedDate:[" + yesterday_str + " TO " + today_str + "]"
-        #query = "cat:cs.* AND submittedDate:[202504260900 TO 202504270600]"
-        print(today_str,yesterday_str)
-
+        query = "cat:cs.* AND submittedDate:[" + self.start_time + " TO " + self.end_time + "]"
         search = arxiv.Search(
             query=query,
-            max_results=8,  # You can set max papers you want here
+            max_results=3,  # You can set max papers you want here
             sort_by=arxiv.SortCriterion.SubmittedDate
         )
-
-        print(f"grabbing arXiv papers in cs.* submitted from {yesterday} to {self.date}......")
-        #print(f"grabbing arXiv papers in cs.* submitted from 202504190600 to 202504200600......")
+        print(f"grabbing arXiv papers in cs.* submitted from {self.start_time} to {self.end_time}......")
 
         tem = client.results(search)
         tem = list(tem)
@@ -442,6 +431,7 @@ class ArxivPDFExtractor(BasePDFExtractor):
         #self.serialize_docs_init()
 
     def extract_all(self):
+        """"All in one function"""
         self.init_docset()
         for doc in self.docs:
             path = doc.pdf_path
@@ -829,6 +819,7 @@ def get_pdf_md(path,store_path,name,ak,sk):
     visual_service.set_sk(sk)
 
     params = dict()
+    pdf_content = None
 
     # 使用 with 语句确保文件正确关闭
     with open(str(path), 'rb') as f:

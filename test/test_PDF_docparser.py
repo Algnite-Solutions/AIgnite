@@ -1,8 +1,6 @@
 import unittest
 import os
-from pathlib import Path
 from AIgnite.data.docparser_new import *
-from bs4 import BeautifulSoup
 import json
 
 class TestArxivPDFExtractor(unittest.TestCase):
@@ -16,16 +14,24 @@ class TestArxivPDFExtractor(unittest.TestCase):
         self.ak = 
         self.sk = 
 
+        today = datetime.now(timezone.utc).date()
+        one_day = timedelta(days=2)
+        today = today - one_day
+        
+        start_time = "0610"
+        end_time = "0620"
+        start_str = today.strftime("%Y%m%d") + start_time
+        end_str = today.strftime("%Y%m%d") + end_time
+        print(f"from {start_str} to {end_str}")
+
         for path in [self.html_text_folder, self.pdf_folder_path, self.image_folder_path, self.json_output_path]:
             os.makedirs(path, exist_ok=True)
 
-        self.extractor2 = ArxivPDFExtractor(None, self.pdf_folder_path, self.image_folder_path, self.arxiv_pool_path, self.json_output_path, self.ak, self.sk)
+        self.extractor = ArxivPDFExtractor(None, self.pdf_folder_path, self.image_folder_path, self.arxiv_pool_path, self.json_output_path, self.ak, self.sk, start_str, end_str)
 
     def test_end_to_end_extraction(self):
 
-        #choose which way to extract here.
-        #self.extractor.extract_all_htmls()
-        self.extractor2.extract_all()
+        self.extractor.extract_all()
 
         files = os.listdir(self.json_output_path)
         self.assertTrue(len(files) > 0, "No JSON output found. Maybe: 1. you can't search anything from the arxiv api. Please change the date you search. 2.All papers are already in the html_urls.txt")
