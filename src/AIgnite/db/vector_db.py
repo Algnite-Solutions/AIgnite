@@ -18,15 +18,16 @@ class VectorEntry:
     vector: Optional[np.ndarray] = None
 
 class VectorDB:
-    def __init__(self, model_name: str = 'BAAI/bge-base-en-v1.5'):
+    def __init__(self, model_name: str = 'BAAI/bge-base-en-v1.5', vector_dim: int = 768):
         """Initialize vector database with embedding model.
         
         Args:
             model_name: Name of the embedding model to use
+            vector_dim: Dimension of the embedding vectors (default: 768 for BGE base model)
         """
         # Initialize embedding model
         self.model = FlagModel(model_name)
-        self.vector_dim = 768  # BGE base model dimension
+        self.vector_dim = vector_dim
         
         # Initialize FAISS index
         self.index = faiss.IndexFlatIP(self.vector_dim)  # Changed to Inner Product similarity

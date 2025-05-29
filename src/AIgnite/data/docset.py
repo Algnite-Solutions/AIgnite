@@ -10,7 +10,7 @@ class ChunkType(str, Enum):
 
 
 class BaseChunk(BaseModel):
-    id: str
+    id: str | None
     type: ChunkType
     title: Optional[str] = None
     caption: Optional[str] = None
@@ -37,7 +37,7 @@ Chunk = Union[TextChunk, FigureChunk, TableChunk]
 
 
 class DocSet(BaseModel):
-    doc_id: str
+    doc_id: str | None
     title: str
     authors: List[str]
     categories: List[str]
@@ -48,6 +48,7 @@ class DocSet(BaseModel):
     table_chunks: List[Chunk] = Field(default_factory=list)
     metadata: dict = Field(default_factory=dict)
     pdf_path: str
+    HTML_path: str | None
 
 class DocSetList(BaseModel):
     docsets: List[DocSet]

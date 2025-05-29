@@ -9,10 +9,10 @@ import io
 class MinioImageDB:
     def __init__(
         self,
-        endpoint: str = "localhost:9000",
-        access_key: str = "ThU32qXfQZHUeGokfpwB",
-        secret_key: str = "XP2GEnl4udzzv7Xp3DW5Y04oc71ndxxoWqKuAmMR",
-        bucket_name: str = "aignite-papers",
+        endpoint: str,
+        access_key: str,
+        secret_key: str,
+        bucket_name: str,
         secure: bool = False
     ):
         """Initialize MinIO client for image storage.

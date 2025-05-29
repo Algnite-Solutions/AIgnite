@@ -53,7 +53,7 @@ class PaperIndexer(BaseIndexer):
                     "categories": paper.categories,
                     "published_date": paper.published_date,
                     "chunk_ids": [chunk.id for chunk in paper.text_chunks],
-                    "image_ids": [chunk.id for chunk in paper.figure_chunks]
+                    "figure_ids": [chunk.id for chunk in paper.figure_chunks]
                 }
                 
                 # Store PDF if available
@@ -186,7 +186,7 @@ class PaperIndexer(BaseIndexer):
                 logger.debug(f"Deleted from vector DB: {success}")
                 
                 # Delete images if they exist
-                if metadata.get("image_ids"):
+                if metadata.get("figure_ids"):
                     success = self.image_db.delete_doc_images(doc_id)
                     logger.debug(f"Deleted images for {doc_id}: {success}")
                 

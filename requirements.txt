@@ -24,3 +24,11 @@ pytest-cov>=4.1.0
 coverage>=7.3.0
 minio>=7.2.0  # MinIO client for Python
 Pillow>=10.0.0  # For image handling in tests
+google-genai                             
+google-generativeai    
+volcengine          
+aspose-pdf           
+PyPDF2           
+img2pdf                  
+Pillow          
+Spire.Pdf             
