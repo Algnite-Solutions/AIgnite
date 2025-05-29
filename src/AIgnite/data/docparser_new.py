@@ -1,9 +1,8 @@
 from bs4 import BeautifulSoup
 from .docset import DocSet, TextChunk, FigureChunk, TableChunk, ChunkType
-from uuid import uuid4
 from pathlib import Path
 #new
-from datetime import datetime, timezone, date, timedelta
+from datetime import datetime, timezone, timedelta
 import arxiv
 import os
 import requests
@@ -12,32 +11,17 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import json
 import time
-import google.generativeai as genai
 import re
-from urllib.parse import urlparse
 from typing import List, Tuple
-import requests
-from urllib.parse import urljoin
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 import base64
 from volcengine.visual.VisualService import VisualService
-import json
-import aspose.pdf as ap
-from PyPDF2 import PdfReader, PdfWriter
-import img2pdf
-from PIL import Image
-import io
-import tempfile
 from spire.pdf.common import *
 from spire.pdf import *
+from abc import ABC, abstractmethod
 
-class ArxivHTMLExtractor():
-    """
-    A class used to extract information from daily arXiv HTMLs and serialize it into JSON files.
-    if there not exist a html then use pdf to extract the remain.
-    """
-    def __init__(self, html_text_folder, pdf_folder_path, arxiv_pool, image_folder_path, json_path):
+class BaseHTMLExtractor(ABC):
+    """Abstract base classes of the HTML extractor"""
+    def __init__(self, html_text_folder, pdf_folder_path, arxiv_pool, image_folder_path, json_path, volcengine_ak, volcengine_sk, start_time, end_time):
         '''
         Args:
         html_text_folder: the folder path used to store the .html file.
@@ -45,6 +29,10 @@ class ArxivHTMLExtractor():
         arxiv_pool: path of a .txt file to store the arxiv_id which is serialized successfully
         image_folder_path:  the folder path used to store the .png file.
         json_path: the folder path used to store the .json file.
+        volcengine_ak: get from https://console.volcengine.com/ai/ability/info/72
+        volcengine_sk: get from https://console.volcengine.com/ai/ability/info/72
+        start_time: the earliest paper you want
+        end_time: the last paper you want
         '''
         self.date = datetime.now(timezone.utc).date()
         self.docs = []
@@ -53,38 +41,122 @@ class ArxivHTMLExtractor():
         self.arxiv_pool = arxiv_pool
         self.image_folder_path = image_folder_path
         self.json_path = json_path
+        self.start_time = start_time
+        self.end_time = end_time
         #Helper
-        self.pdf_parser_helper = ArxivPDFExtractor(self.docs, pdf_folder_path, image_folder_path, arxiv_pool, json_path)
+        self.pdf_parser_helper = ArxivPDFExtractor(self.docs, pdf_folder_path, image_folder_path, arxiv_pool, json_path, volcengine_ak, volcengine_sk, start_time, end_time)
 
-    
+    @abstractmethod
+    def extract_all_htmls(self) -> DocSet:
+        """Carry out the complete extraction process"""
+        pass
+
+    @abstractmethod
+    def init_docset(self):
+        """Initialize the document metadata"""
+        pass
+
+    @abstractmethod
+    def serialize_docs(self):
+        """Serialize the extraction results into JSON"""
+        pass
+
+    @abstractmethod
+    def extract_text(self, soup):
+        """Extract text chunks from HTML"""
+        pass
+
+    @abstractmethod
+    def extract_figures_to_folder(self, soup, img_path, arxivid):
+        """Extract images from HTML and save them to a folder"""
+        pass
+
+    @abstractmethod
+    def extract_tables(self, soup, arxivid):
+        """Extract the table from HTML"""
+        pass
+
+class BasePDFExtractor(ABC):
+    """Abstract base classes of the PDF extractor"""
+
+    def __init__(self, docs, pdf_folder_path, image_folder_path, arxiv_pool, json_path, volcengine_ak, volcengine_sk, start_time, end_time):
+        """
+        the same as HTMLextractor.
+        """
+        if docs is None:
+            self.docs = []
+        else:
+            self.docs = docs
+        self.pdf_folder_path = pdf_folder_path
+        self.image_folder_path = image_folder_path
+        self.pdf_paths = []
+        self.arxiv_pool = arxiv_pool
+        self.json_path = json_path
+        self.date = datetime.now(timezone.utc).date()
+        self.ak = volcengine_ak
+        self.sk = volcengine_sk
+        self.start_time = start_time
+        self.end_time = end_time
+
+    @abstractmethod
+    def extract_all(self):
+        """Carry out the complete extraction process"""
+        pass
+
+    @abstractmethod
+    def remain_docparser(self):
+        """provide help for HTMLparser"""
+        pass
+
+    @abstractmethod
+    def init_docset(self):
+        """Initialize the document metadata"""
+        pass
+
+    @abstractmethod
+    def serialize_docs(self):
+        """Serialize the extraction results into JSON"""
+        pass
+
+    @abstractmethod
+    def pdf_text_chunk(self, markdown_path):
+        """Extract the text chunk from Markdown produced by PDF"""
+        pass
+
+    @abstractmethod
+    def pdf_images_chunk(self, markdown_path, image_folder_path, doc_id):
+        """Extract the img chunk from Markdown produced by PDF"""
+        pass
+
+    @abstractmethod
+    def pdf_tables_chunk(self, markdown_path):
+        """Extract the table chunk from Markdown produced by PDF"""
+        pass
+
+class ArxivHTMLExtractor(BaseHTMLExtractor):
+    """
+    A class used to extract information from daily arXiv HTMLs and serialize it into JSON files.
+    if there not exist a html then use pdf to extract the remain.
+    """
     def init_docset(self):
         """
-        Initialize the docset with papers some metadata:
+        Initialize the docset with papers' some metadata:
         doc_id, title, authors, categories, published_date, abstract, pdf_path, HTML_path
         The 3 types of chunk remain to add
         """
         client = arxiv.Client()
-        one_day = timedelta(days=1)
-        yesterday = self.date - one_day
-        exact_time = "0600"
-        today_str = self.date.strftime("%Y%m%d") + exact_time
-        yesterday_str = yesterday.strftime("%Y%m%d") + exact_time
 
-        #using the format of arxiv api
-        query = "cat:cs.* AND submittedDate:[" + yesterday_str + " TO " + today_str + "]"
-        #query = "cat:cs.* AND submittedDate:[202505210600 TO 202505220600]"
+        query = "cat:cs.* AND submittedDate:[" + self.start_time + " TO " + self.end_time + "]"
 
         search = arxiv.Search(
             query=query,
-            max_results=50,  # You can set max papers you want here
+            max_results=None,  # You can set max papers you want here
             sort_by=arxiv.SortCriterion.SubmittedDate
         )
 
-        print(f"grabbing arXiv papers in cs.* submitted from {yesterday} to {self.date}......")
-        #print(f"grabbing arXiv papers in cs.* submitted from 202504190600 to 202504200600......")
+        print(f"grabbing arXiv papers in cs.* submitted from {self.start_time} to {self.end_time}......")
 
         # Test if we have extracted already or not. Download pdf and try to download html
-
         tem = client.results(search)
         tem = list(tem)
         print("successful search!")
@@ -143,7 +215,6 @@ class ArxivHTMLExtractor():
                 self.docs.append(add_doc)
                 print(f"request failed: {e}, DocSet will not include this HTML.")
 
-
     def extract_text(self, soup: BeautifulSoup):
         try:
             article = soup.find('article')
@@ -193,10 +264,9 @@ class ArxivHTMLExtractor():
                     figure_name = figure_name.replace(' ', '') 
                     if figure_name.endswith('.'):
                         figure_name = figure_name[:-1]
-                    if not figure_name.startswith("Figure"):
+                    if figure_name.startswith("Fig") and not figure_name.startswith("Figure"):
                         figure_name = "Figure" + fig_id[4] + figure_name
                     figure_name = str(arxivid)+'_'+figure_name
-
 
                     img_src = img['src']
                     #Get the complete image URL
@@ -259,8 +329,10 @@ class ArxivHTMLExtractor():
         self.init_docset()
 
         print("Init over. Now begin chunking...")
-
+        i = 0
         for filename in os.listdir(self.html_text_folder):
+            print(i)
+            i = i + 1
             if filename.endswith(".html"):
                 file_path = os.path.join(self.html_text_folder, filename)
 
@@ -296,52 +368,24 @@ class ArxivHTMLExtractor():
                 json_str = json.dumps(doc_dict, indent=4)
                 f.write(json_str)
 
-    def serialize_docs_init(self):
-        """
-        Serialize the extracted documents into JSON files.
-        """
-        output_dir = self.json_path
-        for doc in self.docs:
-            output_path = Path(output_dir) / f"{doc.doc_id}.json"
-            with open(output_path, "w", encoding="utf-8") as f:
-                doc_dict = doc.model_dump()
-                json_str = json.dumps(doc_dict, indent=4)
-                f.write(json_str)
-
-class ArxivPDFExtractor():
-    def __init__(self, docs, pdf_folder_path, image_folder_path, arxiv_pool, json_path):
-        if docs is None:
-            self.docs = []
-        else:
-            self.docs = docs
-        self.pdf_folder_path = pdf_folder_path
-        self.image_folder_path = image_folder_path
-        self.pdf_paths = []
-        self.arxiv_pool = arxiv_pool
-        self.json_path = json_path
-        self.date = datetime.now(timezone.utc).date()
-
+class ArxivPDFExtractor(BasePDFExtractor):
+    """
+    A class used to extract information from daily arXiv PDFs and serialize it into JSON files.
+    """
     def init_docset(self):
+        """
+        Initialize the docset with papers' some metadata:
+        doc_id, title, authors, categories, published_date, abstract, pdf_path, HTML_path
+        The 3 types of chunk remain to add
+        """
         client = arxiv.Client()
-        one_day = timedelta(days=1)
-        yesterday = self.date - one_day
-
-        exact_time = "0600"
-        today_str = self.date.strftime("%Y%m%d") + exact_time
-        yesterday_str = yesterday.strftime("%Y%m%d") + exact_time
-        print(today_str)
-        query = "cat:cs.* AND submittedDate:[" + yesterday_str + " TO " + today_str + "]"
-        #query = "cat:cs.* AND submittedDate:[202504250900 TO 202504260600]"
-        print(today_str,yesterday_str)
-
+        query = "cat:cs.* AND submittedDate:[" + self.start_time + " TO " + self.end_time + "]"
         search = arxiv.Search(
             query=query,
-            max_results=50,  # You can set max papers you want here
+            max_results=3,  # You can set max papers you want here
             sort_by=arxiv.SortCriterion.SubmittedDate
         )
-
-        print(f"grabbing arXiv papers in cs.* submitted from {yesterday} to {self.date}......")
-        #print(f"grabbing arXiv papers in cs.* submitted from 202504190600 to 202504200600......")
+        print(f"grabbing arXiv papers in cs.* submitted from {self.start_time} to {self.end_time}......")
 
         tem = client.results(search)
         tem = list(tem)
@@ -387,11 +431,12 @@ class ArxivPDFExtractor():
         #self.serialize_docs_init()
 
     def extract_all(self):
+        """"All in one function"""
         self.init_docset()
         for doc in self.docs:
             path = doc.pdf_path
             print("getting markdown...")
-            markdown_path = get_pdf_md(path,self.pdf_folder_path,doc.doc_id)
+            markdown_path = get_pdf_md(path,self.pdf_folder_path,doc.doc_id,self.ak,self.sk)
             print("done, begin chunking")
             if markdown_path:
                 doc.figure_chunks = self.pdf_images_chunk(markdown_path,self.image_folder_path,doc.doc_id)
@@ -407,7 +452,7 @@ class ArxivPDFExtractor():
             if doc.HTML_path == None and doc.pdf_path is not None:
                 path = doc.pdf_path
                 print("getting markdown...")
-                markdown_path = get_pdf_md(path,self.pdf_folder_path,doc.doc_id)
+                markdown_path = get_pdf_md(path,self.pdf_folder_path,doc.doc_id,self.ak,self.sk)
                 print("done, begin chunking")
                 if markdown_path:
                     doc.figure_chunks = self.pdf_images_chunk(markdown_path,self.image_folder_path,doc.doc_id)
@@ -427,7 +472,7 @@ class ArxivPDFExtractor():
             image_list = _parse_image_urls(md_content, doc_id)
             if not image_list:
                 print("Warning: No image link was found in Markdown")
-                return
+                return figures
                 
             os.makedirs(image_folder_path, exist_ok=True)
             
@@ -507,7 +552,9 @@ class ArxivPDFExtractor():
 
             # 查找所有一级标题（## 开头，排除如 2.1 开头的子标题）
             # pattern = r'(?:^|\n)(##\s+(?!\d+\.)[^\n]+)'
-            pattern = r'(?:^|\n)(##\s+(?![A-Za-z0-9]+\.)[^\n]+)'
+            #pattern = r'(?:^|\n)(##\s+(?![A-Za-z0-9]+\.)[^\n]+)'
+            #pattern = r'(?:^|\n)(##\s+(?!\d+\.\d+\s)[^\n]+)'
+            pattern = r'(?:^|\n)(##\s+(?!(?:[A-Za-z]+\.)?\d+\.\d+)[^\n]+)'
             matches = list(re.finditer(pattern, md_content))
 
             # 为方便处理，记录所有段落起始位置
@@ -554,7 +601,7 @@ class ArxivPDFExtractor():
 
 ############################################################### Some Tools ####################################################################
     
-def compress_pdf(input_path: str, output_path: str = None, max_size_mb: int = 8) -> str:
+def compress_pdf(input_path: str, output_path: str = None, max_size_mb: float = 7.5) -> str:
     """
     压缩PDF文件，如果文件大小超过指定值
     
@@ -765,21 +812,21 @@ def get_img_from_url(arxivid,img_src):
         print(f"[ERROR] Failed to fetch image {img_url}: {e}")
         return None
 
-def get_pdf_md(path,store_path,name):
+def get_pdf_md(path,store_path,name,ak,sk):
     visual_service = VisualService()
     # call below method if you dont set ak and sk in $HOME/.volc/config
-    after put your ak and sk you can delete this sentence.
-    visual_service.set_ak('')
-    visual_service.set_sk('')
+    visual_service.set_ak(ak)
+    visual_service.set_sk(sk)
 
     params = dict()
+    pdf_content = None
 
     # 使用 with 语句确保文件正确关闭
     with open(str(path), 'rb') as f:
         pdf_content = f.read()
         
-    if os.path.getsize(path) > 8*1024*1024:
-        print(f"📦 PDF 超过 8MB，需要压缩。")
+    if os.path.getsize(path) > 7.5*1024*1024:
+        print(f"📦 PDF 超过 7.5MB，需要压缩。")
         try:
             compressed_path = compress_pdf(path)
             print(f"✅ PDF压缩完成，使用压缩后的文件")
@@ -827,26 +874,6 @@ def get_pdf_md(path,store_path,name):
         print(f"❌ OCR请求失败：{str(e)}")
         return None
 
-def get_Gemini_response(api_key,file_path,prompt):
-
-    os.environ['http proxy']="http://127.0.0.1:7890"
-    os.environ['https proxy']="http://127.0.0.1:7890"
-
-    genai.configure(api_key=api_key)
-
-    #uploaded_file = genai.upload_file(path="/data3/peirongcan/paperIgnite/AIgnite/src/AIgnite/data/resp.md", display_name="Sample PDF")
-    uploaded_file = genai.upload_file(path = file_path, display_name="Sample")
-    print("Uploaded file name:", uploaded_file.name)
-
-    model = genai.GenerativeModel("gemini-2.0-flash")
-
-    response = model.generate_content([
-        uploaded_file,
-        prompt
-    ])
-
-    return(response.text)
-
 def _parse_image_urls(content: str,arxiv_id) -> List[Tuple[str, str, str]]:
     """内部函数：解析图片URL并提取符合规则的名称"""
     # 正则规则说明：
@@ -880,7 +907,15 @@ def _extract_name_from_context(content: str, url: str) -> str:
         # 提取匹配内容并去除点和空格
         raw_name = match.group(0)
         cleaned_name = raw_name.replace('.', '').replace(' ', '')  # 去除点和空格
-        return cleaned_name.lower() if cleaned_name.startswith('f') else cleaned_name  # 统一小写（可选）
+        
+        # 首字母大写
+        cleaned_name = cleaned_name[0].upper() + cleaned_name[1:]
+        
+        # 将Fig开头转换为Figure开头
+        if cleaned_name.startswith('Fig') and not cleaned_name.startswith('Figure'):
+            cleaned_name = 'Figure' + cleaned_name[3:]
+            
+        return cleaned_name
     return ""
 
 def _extract_caption_from_context(content: str, url: str) -> str:
@@ -901,9 +936,11 @@ def _download_single_image(name: str, url: str, save_dir: str) -> bool:
         response.raise_for_status()
         
         # 处理文件扩展名（支持URL中带查询参数的情况）
-        ext = url.split('.')[-1].split('?')[0].lower()
+        '''ext = url.split('.')[-1].split('?')[0].lower()
         if ext not in ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff']:
-            ext = 'jpg'  # 默认扩展名
+            ext = 'png'  # 默认扩展名'''
+        
+        ext = 'png'
         
         file_name = f"{name}.{ext}"
         save_path = os.path.join(save_dir, file_name)
