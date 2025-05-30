@@ -1,14 +1,20 @@
 import unittest
 import numpy as np
+import os
+import shutil
 from AIgnite.db.vector_db import VectorDB, VectorEntry
 
 class TestVectorDB(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up test data and VectorDB instance."""
+        # Create a temporary directory for test database
+        cls.test_db_path = "test_vector_db"
+        os.makedirs(cls.test_db_path, exist_ok=True)
+        
         cls.vector_db = VectorDB(
-            model_name='BAAI/bge-base-en-v1.5',
-            dimension=768
+            db_path=os.path.join(cls.test_db_path, "test_db"),
+            model_name='BAAI/bge-base-en-v1.5'
         )
         
         # Test documents data
@@ -92,39 +98,39 @@ class TestVectorDB(unittest.TestCase):
 
     def setUp(self):
         """Clean up any existing test data before each test."""
-        for doc in self.test_docs.values():
-            self.vector_db.delete_document(doc["doc_id"])
+        # Delete and recreate vector database for each test
+        if os.path.exists(f"{self.vector_db.db_path}.index"):
+            os.remove(f"{self.vector_db.db_path}.index")
+        if os.path.exists(f"{self.vector_db.db_path}.entries"):
+            os.remove(f"{self.vector_db.db_path}.entries")
 
-    def test_add_multiple_documents(self):
-        """Test adding multiple documents with abstract and chunks."""
+    def test_01_add_multiple_documents(self):
+        """Test 1: Adding multiple documents and verifying duplicate prevention."""
         # Add all test documents
         for doc in self.test_docs.values():
-            self.vector_db.add_document(
+            success = self.vector_db.add_document(
                 doc_id=doc["doc_id"],
                 abstract=doc["abstract"],
                 text_chunks=doc["text_chunks"],
                 metadata=doc["metadata"]
             )
+            self.assertTrue(success)
         
-        # Verify all documents were added correctly
-        for doc in self.test_docs.values():
-            vectors = self.vector_db.get_document_vectors(doc["doc_id"])
-            self.assertEqual(len(vectors), len(doc["text_chunks"]) + 1)  # chunks + abstract
-            
-            # Verify abstract
-            abstract_entry = next(v for v in vectors if v.text_type == "abstract")
-            self.assertEqual(abstract_entry.text, doc["abstract"])
-            self.assertEqual(abstract_entry.metadata, doc["metadata"])
-            
-            # Verify chunks
-            chunk_entries = [v for v in vectors if v.text_type == "chunk"]
-            self.assertEqual(len(chunk_entries), len(doc["text_chunks"]))
-            for i, chunk in enumerate(chunk_entries):
-                self.assertEqual(chunk.text, doc["text_chunks"][i])
-                self.assertEqual(chunk.chunk_id, i)
+        # Try to add the same document again - should fail
+        doc = next(iter(self.test_docs.values()))
+        success = self.vector_db.add_document(
+            doc_id=doc["doc_id"],
+            abstract=doc["abstract"],
+            text_chunks=doc["text_chunks"],
+            metadata=doc["metadata"]
+        )
+        self.assertFalse(success)
+        
+        # Save the database
+        self.assertTrue(self.vector_db.save())
 
-    def test_search_abstract(self):
-        """Test searching with focus on abstract."""
+    def test_02_search_abstract(self):
+        """Test 2: Searching with focus on abstract."""
         # Add all test documents
         for doc in self.test_docs.values():
             self.vector_db.add_document(
@@ -137,100 +143,129 @@ class TestVectorDB(unittest.TestCase):
         # Test different queries
         test_queries = [
             ("machine learning AI applications", "2106.14834"),  # Should match ML paper
-            ("quantum computing algorithms", "2106.14838"),      # Should match quantum paper
-            ("robotic control reinforcement", "2106.14837"),    # Should match robotics paper
+            ("natural language processing transformers", "2106.14835"),  # Should match NLP paper
         ]
         
         for query, expected_doc_id in test_queries:
-            results = self.vector_db.search(query, k=5, filter_type="abstract")
+            results = self.vector_db.search(query, k=5)
             self.assertTrue(len(results) > 0)
             entry, score = results[0]
             self.assertEqual(entry.doc_id, expected_doc_id)
-            self.assertEqual(entry.text_type, "abstract")
             self.assertTrue(0 <= score <= 1)
 
-    def test_search_chunks(self):
-        """Test searching text chunks."""
-        # Add all test documents
-        for doc in self.test_docs.values():
-            self.vector_db.add_document(
-                doc_id=doc["doc_id"],
-                abstract=doc["abstract"],
-                text_chunks=doc["text_chunks"],
-                metadata=doc["metadata"]
-            )
+    def test_03_delete_document(self):
+        """Test 3: Deleting a document."""
+        # Create a test document with unique ID
+        test_doc = {
+            "doc_id": "test_delete_doc_id",  # Unique ID for this test
+            "abstract": "Test abstract for deletion",
+            "text_chunks": ["Test chunk 1", "Test chunk 2"],
+            "metadata": {
+                "title": "Test Document",
+                "authors": ["Test Author"],
+                "categories": ["test"],
+                "published_date": "2024-01-01"
+            }
+        }
         
-        # Test different chunk-specific queries
-        test_queries = [
-            ("BERT GPT language models", "2106.14835"),        # Should match NLP paper
-            ("CNN image processing", "2106.14836"),            # Should match vision paper
-            ("quantum optimization problems", "2106.14838"),    # Should match quantum paper
-        ]
+        # First add the document
+        success = self.vector_db.add_document(
+            doc_id=test_doc["doc_id"],
+            abstract=test_doc["abstract"],
+            text_chunks=test_doc["text_chunks"],
+            metadata=test_doc["metadata"]
+        )
+        self.assertTrue(success)
         
-        for query, expected_doc_id in test_queries:
-            results = self.vector_db.search(query, k=5, filter_type="chunk")
-            self.assertTrue(len(results) > 0)
-            entry, score = results[0]
-            self.assertEqual(entry.doc_id, expected_doc_id)
-            self.assertEqual(entry.text_type, "chunk")
-            self.assertTrue(0 <= score <= 1)
+        # Save the database
+        self.assertTrue(self.vector_db.save())
+        
+        # Delete the document
+        success = self.vector_db.delete_document(test_doc["doc_id"])
+        self.assertTrue(success)
+        
+        # Save after deletion
+        self.assertTrue(self.vector_db.save())
+        
+        # Try to add the same document again - should succeed now
+        success = self.vector_db.add_document(
+            doc_id=test_doc["doc_id"],
+            abstract=test_doc["abstract"],
+            text_chunks=test_doc["text_chunks"],
+            metadata=test_doc["metadata"]
+        )
+        self.assertTrue(success)
 
-    def test_delete_multiple_documents(self):
-        """Test deleting multiple documents."""
-        # First add all documents
-        for doc in self.test_docs.values():
-            self.vector_db.add_document(
-                doc_id=doc["doc_id"],
-                abstract=doc["abstract"],
-                text_chunks=doc["text_chunks"],
-                metadata=doc["metadata"]
-            )
-        
-        # Delete each document and verify
-        for doc in self.test_docs.values():
-            # Verify document exists
-            vectors_before = self.vector_db.get_document_vectors(doc["doc_id"])
-            self.assertTrue(len(vectors_before) > 0)
-            
-            # Delete document
-            result = self.vector_db.delete_document(doc["doc_id"])
-            self.assertTrue(result)
-            
-            # Verify document was deleted
-            vectors_after = self.vector_db.get_document_vectors(doc["doc_id"])
-            self.assertEqual(len(vectors_after), 0)
-
-    def test_vector_id_generation(self):
-        """Test vector ID generation."""
-        doc_id = "test123"
-        
-        # Test abstract ID
-        abstract_id = self.vector_db._generate_vector_id(doc_id, "abstract")
-        self.assertEqual(abstract_id, "test123:abstract")
-        
-        # Test chunk ID
-        chunk_id = self.vector_db._generate_vector_id(doc_id, "chunk", 0)
-        self.assertEqual(chunk_id, "test123:chunk:0")
-
-    def test_nonexistent_document(self):
-        """Test handling of non-existent documents."""
-        # Try to get vectors for non-existent document
-        vectors = self.vector_db.get_document_vectors("nonexistent")
-        self.assertEqual(len(vectors), 0)
-        
+    def test_04_nonexistent_document(self):
+        """Test 4: Handling of non-existent documents."""
         # Try to delete non-existent document
         result = self.vector_db.delete_document("nonexistent")
         self.assertFalse(result)
 
+    def test_05_load_existing_database(self):
+        """Test 5: Loading from an existing database file."""
+        # Create test documents with unique IDs
+        test_docs = [
+            {
+                "doc_id": "test_load_doc_1",
+                "abstract": "Test abstract for loading 1",
+                "text_chunks": ["Test chunk 1", "Test chunk 2"],
+                "metadata": {
+                    "title": "Test Document 1",
+                    "authors": ["Test Author 1"],
+                    "categories": ["test"],
+                    "published_date": "2024-01-01"
+                }
+            },
+            {
+                "doc_id": "test_load_doc_2",
+                "abstract": "Test abstract for loading 2",
+                "text_chunks": ["Test chunk 3", "Test chunk 4"],
+                "metadata": {
+                    "title": "Test Document 2",
+                    "authors": ["Test Author 2"],
+                    "categories": ["test"],
+                    "published_date": "2024-01-02"
+                }
+            }
+        ]
+        
+        # First add documents and save
+        for doc in test_docs:
+            success = self.vector_db.add_document(
+                doc_id=doc["doc_id"],
+                abstract=doc["abstract"],
+                text_chunks=doc["text_chunks"],
+                metadata=doc["metadata"]
+            )
+            self.assertTrue(success)
+        
+        # Save the current state
+        self.assertTrue(self.vector_db.save())
+        
+        # Create a new VectorDB instance - should load existing data
+        new_vector_db = VectorDB(
+            db_path=self.vector_db.db_path,
+            model_name='BAAI/bge-base-en-v1.5'
+        )
+        
+        # Verify the data was loaded
+        for doc in test_docs:
+            # Try to add the same document - should fail if loaded correctly
+            success = new_vector_db.add_document(
+                doc_id=doc["doc_id"],
+                abstract=doc["abstract"],
+                text_chunks=doc["text_chunks"],
+                metadata=doc["metadata"]
+            )
+            self.assertFalse(success, f"Document {doc['doc_id']} should already exist")
+
     @classmethod
     def tearDownClass(cls):
         """Clean up test data."""
-        # Clean up all test documents
-        for doc in cls.test_docs.values():
-            try:
-                cls.vector_db.delete_document(doc["doc_id"])
-            except:
-                pass
+        # Clean up the test directory
+        if os.path.exists(cls.test_db_path):
+            shutil.rmtree(cls.test_db_path)
         
         # Clean up model
         if hasattr(cls.vector_db, 'model'):

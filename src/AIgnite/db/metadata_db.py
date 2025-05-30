@@ -83,84 +83,65 @@ class MetadataDB:
         
         Args:
             db_path: Database connection string
+            
+        Raises:
+            ValueError: If db_path is not provided
         """
         if not db_path:
-            db_path = "postgresql://postgres:11111@localhost:5432/aignite"
+            raise ValueError("Database path must be provided for MetadataDB initialization")
             
         self.engine = create_engine(db_path)
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
 
-    def save_paper(self, doc_id: str, pdf_path: str, metadata: Dict[str, Any] | DocSet) -> bool:
+    def save_paper(self, doc_id: str, pdf_path: str, metadata: Dict[str, Any]) -> bool:
         """Save paper PDF and metadata.
         
         Args:
             doc_id: Document ID
             pdf_path: Path to PDF file
-            metadata: Dictionary containing paper metadata or DocSet object
+            metadata: Dictionary containing paper metadata with required fields:
+                     title, abstract, authors, categories, published_date
             
         Returns:
-            True if successful, False otherwise
+            True if successful, False if doc_id already exists or on error
+            
+        Raises:
+            ValueError: If required metadata fields are missing
         """
+        required_fields = ['title', 'abstract', 'authors', 'categories', 'published_date']
+        missing_fields = [field for field in required_fields if field not in metadata]
+        if missing_fields:
+            raise ValueError(f"Missing required metadata fields: {', '.join(missing_fields)}")
+            
         session = self.Session()
         try:
+            # Check if paper already exists
+            if session.query(TableSchema).filter_by(doc_id=doc_id).first():
+                logging.warning(f"Paper {doc_id} already exists. Skip saving.")
+                return False
+
             # Read PDF binary data
             with open(pdf_path, 'rb') as pdf_file:
                 pdf_data = pdf_file.read()
 
-            # Create or update paper
-            paper = session.query(TableSchema).filter_by(doc_id=doc_id).first()
-            
-            if isinstance(metadata, DocSet):
-                if paper:
-                    # Update existing paper
-                    paper.title = metadata.title
-                    paper.abstract = metadata.abstract
-                    paper.authors = metadata.authors
-                    paper.categories = metadata.categories
-                    paper.published_date = metadata.published_date
-                    paper.pdf_data = pdf_data
-                    paper.chunk_ids = [chunk.id for chunk in metadata.text_chunks]
-                    paper.figure_ids = [chunk.id for chunk in metadata.figure_chunks]
-                    paper.table_ids = [chunk.id for chunk in metadata.table_chunks]
-                    paper.extra_metadata = metadata.metadata
-                    paper.pdf_path = metadata.pdf_path
-                    paper.HTML_path = metadata.HTML_path
-                else:
-                    # Create new paper
-                    paper = TableSchema.from_docset(metadata, pdf_data)
-                    session.add(paper)
-            else:
-                # Handle dictionary metadata (for backward compatibility)
-                if paper:
-                    paper.title = metadata['title']
-                    paper.abstract = metadata['abstract']
-                    paper.authors = metadata['authors']
-                    paper.categories = metadata['categories']
-                    paper.published_date = metadata['published_date']
-                    paper.pdf_data = pdf_data
-                    paper.chunk_ids = metadata.get('chunk_ids', [])
-                    paper.figure_ids = metadata.get('figure_ids', [])
-                    paper.table_ids = metadata.get('table_ids', [])
-                    paper.extra_metadata = metadata.get('metadata', {})
-                else:
-                    paper = TableSchema(
-                        doc_id=doc_id,
-                        title=metadata['title'],
-                        abstract=metadata['abstract'],
-                        authors=metadata['authors'],
-                        categories=metadata['categories'],
-                        published_date=metadata['published_date'],
-                        pdf_data=pdf_data,
-                        chunk_ids=metadata.get('chunk_ids', []),
-                        figure_ids=metadata.get('figure_ids', []),
-                        table_ids=metadata.get('table_ids', []),
-                        extra_metadata=metadata.get('metadata', {}),
-                        pdf_path=metadata.get('pdf_path', ''),
-                        HTML_path=metadata.get('HTML_path')
-                    )
-                    session.add(paper)
-            
+            # Create new paper
+            paper = TableSchema(
+                doc_id=doc_id,
+                title=metadata['title'],
+                abstract=metadata['abstract'],
+                authors=metadata['authors'],
+                categories=metadata['categories'],
+                published_date=metadata['published_date'],
+                pdf_data=pdf_data,
+                chunk_ids=metadata.get('chunk_ids', []),
+                figure_ids=metadata.get('figure_ids', []),
+                table_ids=metadata.get('table_ids', []),
+                extra_metadata=metadata.get('metadata', {}),
+                pdf_path=pdf_path,
+                HTML_path=metadata.get('HTML_path')
+            )
+            session.add(paper)
             session.commit()
             return True
         except Exception as e:

@@ -3,6 +3,8 @@ import faiss
 import numpy as np
 from FlagEmbedding import FlagModel
 import logging
+import os
+import pickle
 from dataclasses import dataclass
 
 # Set up logging
@@ -18,21 +20,39 @@ class VectorEntry:
     vector: Optional[np.ndarray] = None
 
 class VectorDB:
-    def __init__(self, model_name: str = 'BAAI/bge-base-en-v1.5', vector_dim: int = 768):
+    def __init__(self, db_path: str, model_name: str = 'BAAI/bge-base-en-v1.5', vector_dim: int = 768):
         """Initialize vector database with embedding model.
         
         Args:
+            db_path: Path to save/load the vector database. Will try to load existing DB from this path first.
             model_name: Name of the embedding model to use
             vector_dim: Dimension of the embedding vectors (default: 768 for BGE base model)
+            
+        Raises:
+            ValueError: If db_path is not provided
         """
-        # Initialize embedding model
-        self.model = FlagModel(model_name)
+        if not db_path:
+            raise ValueError("db_path must be provided for VectorDB initialization")
+            
+        self.db_path = db_path
         self.vector_dim = vector_dim
         
-        # Initialize FAISS index
-        self.index = faiss.IndexFlatIP(self.vector_dim)  # Changed to Inner Product similarity
+        # Initialize embedding model
+        self.model = FlagModel(model_name)
         
-        # Store mapping of vector IDs to entries
+        # Try to load existing database first
+        if self.exists():
+            logger.info(f"Found existing vector database at {db_path}")
+            if self.load():
+                logger.info("Successfully loaded existing vector database")
+                return
+            else:
+                logger.warning("Failed to load existing vector database, initializing new one")
+        else:
+            logger.info("No existing vector database found, initializing new one")
+            
+        # Initialize new FAISS index and empty entries list if loading failed or database doesn't exist
+        self.index = faiss.IndexFlatIP(self.vector_dim)
         self.entries: List[VectorEntry] = []
         
     def __del__(self):
@@ -43,6 +63,61 @@ class VectorDB:
             except:
                 pass
             self.model = None
+
+    def save(self) -> bool:
+        """Save the vector database to disk.
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+            
+            # Save FAISS index
+            faiss.write_index(self.index, f"{self.db_path}.index")
+            
+            # Save entries
+            with open(f"{self.db_path}.entries", 'wb') as f:
+                pickle.dump(self.entries, f)
+                
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save vector database: {str(e)}")
+            return False
+
+    def load(self) -> bool:
+        """Load the vector database from disk.
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            # Check if files exist
+            if not self.exists():
+                logger.info("Vector database files don't exist")
+                return False
+                
+            # Load FAISS index
+            self.index = faiss.read_index(f"{self.db_path}.index")
+            
+            # Load entries
+            with open(f"{self.db_path}.entries", 'rb') as f:
+                self.entries = pickle.load(f)
+                
+            return True
+        except Exception as e:
+            logger.error(f"Failed to load vector database: {str(e)}")
+            return False
+
+    def exists(self) -> bool:
+        """Check if vector database files exist.
+        
+        Returns:
+            bool: True if database files exist, False otherwise
+        """
+        return (os.path.exists(f"{self.db_path}.index") and 
+                os.path.exists(f"{self.db_path}.entries"))
 
     def _get_embedding(self, text: str) -> np.ndarray:
         """Get embedding vector for text.
@@ -89,6 +164,11 @@ class VectorDB:
             True if successful, False otherwise
         """
         try:
+            # Check if document already exists
+            if any(entry.doc_id == doc_id for entry in self.entries):
+                logger.warning(f"Document {doc_id} already exists in vector database. Skip adding.")
+                return False
+            
             # Create combined text for better document-level matching
             title = metadata.get('title', '')
             categories = ' '.join(metadata.get('categories', []))
@@ -130,7 +210,7 @@ class VectorDB:
             return True
             
         except Exception as e:
-            logging.error(f"Failed to add document {doc_id} to vector database: {str(e)}")
+            logger.error(f"Failed to add document {doc_id} to vector database: {str(e)}")
             return False
 
     def search(

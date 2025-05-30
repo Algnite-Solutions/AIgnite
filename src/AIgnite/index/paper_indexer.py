@@ -57,7 +57,7 @@ class PaperIndexer(BaseIndexer):
                 }
                 
                 # Store PDF if available
-                if hasattr(paper, 'pdf_path') and os.path.exists(paper.pdf_path):
+                if hasattr(paper, 'pdf_path'):
                     success = self.metadata_db.save_paper(paper.doc_id, paper.pdf_path, metadata)
                     logger.debug(f"Stored paper and metadata for {paper.doc_id}: {success}")
                 else:
@@ -73,6 +73,13 @@ class PaperIndexer(BaseIndexer):
                     metadata=metadata
                 )
                 logger.debug(f"Added vectors for {paper.doc_id}: {success}")
+                
+                # Save vector database after successful addition
+                if success:
+                    save_success = self.vector_db.save()
+                    logger.debug(f"Saved vector database after adding {paper.doc_id}: {save_success}")
+                    if not save_success:
+                        raise RuntimeError(f"Failed to save vector database after adding {paper.doc_id}")
                 
                 # Store figures in image database with progress bar
                 if paper.figure_chunks:
