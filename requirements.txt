@@ -15,6 +15,15 @@ urllib3
 fastapi==0.115.12
 uvicorn==0.34.2
 starlette==0.46.2
+google-genai
+sqlalchemy>=1.4.0
+psycopg2-binary>=2.9.0
+# Testing dependencies
+pytest>=7.4.0
+pytest-cov>=4.1.0
+coverage>=7.3.0
+minio>=7.2.0  # MinIO client for Python
+Pillow>=10.0.0  # For image handling in tests
 google-genai                             
 google-generativeai    
 volcengine          
