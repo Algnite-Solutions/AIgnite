@@ -250,7 +250,7 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
 
     def extract_figures_to_folder(self, soup, img_path, arxivid):
         figures = []
-        #for fig in soup.find_all('figure'):
+
         for fig in soup.find_all(lambda tag: tag.name == 'figure' and 'ltx_table' not in tag.get('class', [])):
             img = fig.find('img')
             caption = fig.find('figcaption')
@@ -258,15 +258,14 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
 
             if img and caption:
                 tag = caption.find('span', class_='ltx_tag_figure')
-                if tag:
-                    figure_name = tag.text.strip().rstrip(':').strip()
-                    #Remove all the Spaces
-                    figure_name = figure_name.replace(' ', '') 
-                    if figure_name.endswith('.'):
-                        figure_name = figure_name[:-1]
-                    if figure_name.startswith("Fig") and not figure_name.startswith("Figure"):
-                        figure_name = "Figure" + fig_id[4] + figure_name
-                    figure_name = str(arxivid)+'_'+figure_name
+                if tag and fig_id:
+                    numbers = re.findall(r'\d+', fig_id)
+                    if len(numbers) == 2:
+                        figure_name = str(arxivid)+'_'+"Figure" + numbers[1]
+                    elif len(fig_id) > 2:
+                        figure_name = str(arxivid)+'_'+"Figure" + numbers[1] + f'({numbers[2]})'
+                    else:
+                        figure_name = str(arxivid)+'_'+"Figure"
 
                     img_src = img['src']
                     #Get the complete image URL
@@ -348,11 +347,11 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
                             docset.table_chunks = table_chunks
                             docset.text_chunks = self.extract_text(soup)
         
-        self.pdf_parser_helper.docs = self.docs
+        '''self.pdf_parser_helper.docs = self.docs
         self.pdf_parser_helper.remain_docparser()
-        self.docs = self.pdf_parser_helper.docs
+        self.docs = self.pdf_parser_helper.docs'''
 
-        self.serialize_docs()
+        #self.serialize_docs()
                    
     def serialize_docs(self):
         """
@@ -382,7 +381,7 @@ class ArxivPDFExtractor(BasePDFExtractor):
         query = "cat:cs.* AND submittedDate:[" + self.start_time + " TO " + self.end_time + "]"
         search = arxiv.Search(
             query=query,
-            max_results=3,  # You can set max papers you want here
+            max_results=None,  # You can set max papers you want here
             sort_by=arxiv.SortCriterion.SubmittedDate
         )
         print(f"grabbing arXiv papers in cs.* submitted from {self.start_time} to {self.end_time}......")
@@ -392,7 +391,6 @@ class ArxivPDFExtractor(BasePDFExtractor):
         print("successful search!")
         for result in tem:
             print(1)
-            #time.sleep(5)
             arxiv_id = result.pdf_url.split('/')[-1]
             print(2)
             with open(self.arxiv_pool, "r", encoding="utf-8") as f:

@@ -30,7 +30,9 @@ class TestArxivHTMLExtractorParallel(unittest.TestCase):
 
         today = datetime.now(timezone.utc).date() - timedelta(days=2)
         self.date_str = today.strftime("%Y%m%d")
-        self.time_slots = divide_one_day_into(self.date_str, 3)
+        #self.time_slots = divide_one_day_into(self.date_str, 3)
+        self.time_slots = divide_one_day_into('20240611', 3)
+
 
         for path in [self.html_text_folder, self.pdf_folder_path, self.image_folder_path, self.json_output_path]:
             os.makedirs(path, exist_ok=True)
@@ -48,6 +50,10 @@ class TestArxivHTMLExtractorParallel(unittest.TestCase):
             end_time=end_str
         )
         extractor.extract_all_htmls()
+        extractor.pdf_parser_helper.docs = extractor.docs
+        extractor.pdf_parser_helper.remain_docparser()
+        extractor.docs = extractor.pdf_parser_helper.docs
+        extractor.serialize_docs()
 
     def test_parallel_extraction(self):
         with ThreadPoolExecutor(max_workers=3) as executor:

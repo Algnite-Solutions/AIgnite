@@ -22,6 +22,10 @@ class TestArxivHTMLExtractor(unittest.TestCase):
         end_time = "0630"
         start_str = today.strftime("%Y%m%d") + start_time
         end_str = today.strftime("%Y%m%d") + end_time
+
+        start_str =  "20240530" + start_time
+        end_str = "20240530" + end_time
+
         print(f"from {start_str} to {end_str}")
 
         for path in [self.html_text_folder, self.pdf_folder_path, self.image_folder_path, self.json_output_path]:
