@@ -3,6 +3,8 @@ from typing import Dict, Any, Optional, List
 from sqlalchemy import create_engine, Column, String, Integer, JSON, Text, LargeBinary
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, declared_attr
+from sqlalchemy import text, Index
+from sqlalchemy.sql import func
 import logging
 import os
 from ..data.docset import DocSet, BaseModel, Field
@@ -30,6 +32,15 @@ class TableSchema(Base):
     extra_metadata = Column(JSON)  # Store metadata dict
     pdf_path = Column(String)
     HTML_path = Column(String, nullable=True)
+    
+    # Add tsvector column for full-text search
+    __table_args__ = (
+        Index(
+            'idx_fts',
+            text('to_tsvector(\'english\', coalesce(title, \'\') || \' \' || coalesce(abstract, \'\'))'),
+            postgresql_using='gin'
+        ),
+    )
     
     @classmethod
     def from_docset(cls, docset: DocSet, pdf_data: bytes = None) -> 'TableSchema':
@@ -93,6 +104,121 @@ class MetadataDB:
         self.engine = create_engine(db_path)
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
+        
+        # Create full-text search function if using PostgreSQL
+        self._create_fts_function()
+
+    def _create_fts_function(self):
+        """Create custom full-text search ranking function."""
+        session = self.Session()
+        try:
+            # Create a custom ranking function that combines ts_rank_cd with document weights
+            session.execute(text("""
+                CREATE OR REPLACE FUNCTION fts_rank(
+                    v tsvector,
+                    q tsquery,
+                    title_weight float DEFAULT 0.7,
+                    abstract_weight float DEFAULT 0.3
+                ) RETURNS float AS $$
+                BEGIN
+                    RETURN (
+                        title_weight * ts_rank_cd(
+                            setweight(to_tsvector('english', coalesce(title, '')), 'A'),
+                            q
+                        ) +
+                        abstract_weight * ts_rank_cd(
+                            setweight(to_tsvector('english', coalesce(abstract, '')), 'B'),
+                            q
+                        )
+                    );
+                END;
+                $$ LANGUAGE plpgsql;
+            """))
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            logging.warning(f"Failed to create FTS function: {str(e)}")
+        finally:
+            session.close()
+
+    def search_papers(
+        self,
+        query: str,
+        top_k: int = 10,
+        similarity_cutoff: float = 0.1
+    ) -> List[Dict[str, Any]]:
+        """Search papers using PostgreSQL full-text search.
+        
+        Args:
+            query: Search query string
+            top_k: Maximum number of results to return
+            similarity_cutoff: Minimum similarity score (0-1) to include in results
+            
+        Returns:
+            List of paper metadata dictionaries with search scores
+        """
+        session = self.Session()
+        try:
+            # Convert query to tsquery and perform search
+            search_results = session.execute(text("""
+                WITH search_results AS (
+                    SELECT
+                        doc_id,
+                        title,
+                        abstract,
+                        authors,
+                        categories,
+                        published_date,
+                        extra_metadata as metadata,
+                        fts_rank(
+                            to_tsvector('english', coalesce(title, '') || ' ' || coalesce(abstract, '')),
+                            plainto_tsquery('english', :query)
+                        ) as score,
+                        ts_headline(
+                            'english',
+                            coalesce(title, '') || ' ' || coalesce(abstract, ''),
+                            plainto_tsquery('english', :query),
+                            'StartSel=<mark>, StopSel=</mark>, MaxWords=50, MinWords=20'
+                        ) as headline
+                    FROM papers
+                    WHERE to_tsvector('english', coalesce(title, '') || ' ' || coalesce(abstract, '')) @@ 
+                          plainto_tsquery('english', :query)
+                )
+                SELECT *
+                FROM search_results
+                WHERE score >= :cutoff
+                ORDER BY score DESC
+                LIMIT :limit
+            """), {
+                'query': query,
+                'cutoff': similarity_cutoff,
+                'limit': top_k
+            })
+            
+            results = []
+            for row in search_results:
+                result_dict = {
+                    'doc_id': row.doc_id,
+                    'score': float(row.score),
+                    'metadata': {
+                        'title': row.title,
+                        'abstract': row.abstract,
+                        'authors': row.authors,
+                        'categories': row.categories,
+                        'published_date': row.published_date,
+                        **(row.metadata or {})
+                    },
+                    'matched_text': row.headline
+                }
+                results.append(result_dict)
+                
+            return results
+            
+        except Exception as e:
+            logging.error(f"Search failed: {str(e)}")
+            return []
+        finally:
+            session.close()
 
     def save_paper(self, doc_id: str, pdf_path: str, metadata: Dict[str, Any]) -> bool:
         """Save paper PDF and metadata.
