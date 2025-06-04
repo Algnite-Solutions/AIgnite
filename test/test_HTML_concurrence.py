@@ -1,6 +1,6 @@
 import unittest
 import os
-from AIgnite.data.docparser_new import *
+from AIgnite.data.htmlparser import *
 import json
 from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor
