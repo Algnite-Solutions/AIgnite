@@ -9,6 +9,9 @@ import logging
 import os
 from ..data.docset import DocSet, BaseModel, Field
 
+# Set up logging
+logger = logging.getLogger(__name__)
+
 Base = declarative_base()
 
 class TableSchema(Base):
@@ -118,7 +121,8 @@ class MetadataDB:
             # Create a custom ranking function that combines ts_rank_cd with document weights
             session.execute(text("""
                 CREATE OR REPLACE FUNCTION fts_rank(
-                    v tsvector,
+                    title text,
+                    abstract text,
                     q tsquery,
                     title_weight float DEFAULT 0.7,
                     abstract_weight float DEFAULT 0.3
@@ -150,19 +154,16 @@ class MetadataDB:
         top_k: int = 10,
         similarity_cutoff: float = 0.1
     ) -> List[Dict[str, Any]]:
-        """Search papers using PostgreSQL full-text search.
-        
-        Args:
-            query: Search query string
-            top_k: Maximum number of results to return
-            similarity_cutoff: Minimum similarity score (0-1) to include in results
-            
-        Returns:
-            List of paper metadata dictionaries with search scores
-        """
+        """Search papers using PostgreSQL full-text search."""
         session = self.Session()
         try:
-            # Convert query to tsquery and perform search
+            # First, let's debug the query parsing
+            debug_query = session.execute(text("""
+                SELECT plainto_tsquery('english', :query) as parsed_query
+            """), {'query': query}).scalar()
+            logger.debug(f"Parsed query: {debug_query}")
+
+            # Modified search query with new fts_rank signature
             search_results = session.execute(text("""
                 WITH search_results AS (
                     SELECT
@@ -174,18 +175,19 @@ class MetadataDB:
                         published_date,
                         extra_metadata as metadata,
                         fts_rank(
-                            to_tsvector('english', coalesce(title, '') || ' ' || coalesce(abstract, '')),
-                            plainto_tsquery('english', :query)
+                            title,
+                            abstract,
+                            to_tsquery('english', :query)
                         ) as score,
                         ts_headline(
                             'english',
                             coalesce(title, '') || ' ' || coalesce(abstract, ''),
-                            plainto_tsquery('english', :query),
+                            to_tsquery('english', :query),
                             'StartSel=<mark>, StopSel=</mark>, MaxWords=50, MinWords=20'
                         ) as headline
                     FROM papers
                     WHERE to_tsvector('english', coalesce(title, '') || ' ' || coalesce(abstract, '')) @@ 
-                          plainto_tsquery('english', :query)
+                          to_tsquery('english', :query)
                 )
                 SELECT *
                 FROM search_results
@@ -193,11 +195,12 @@ class MetadataDB:
                 ORDER BY score DESC
                 LIMIT :limit
             """), {
-                'query': query,
+                'query': ' & '.join(query.split()),  # Convert space-separated terms to &-separated
                 'cutoff': similarity_cutoff,
                 'limit': top_k
             })
-            
+
+            # Debug the results
             results = []
             for row in search_results:
                 result_dict = {
@@ -214,11 +217,12 @@ class MetadataDB:
                     'matched_text': row.headline
                 }
                 results.append(result_dict)
-                
+                logger.debug(f"Found result: {result_dict['doc_id']} with score {result_dict['score']}")
+
             return results
-            
+
         except Exception as e:
-            logging.error(f"Search failed: {str(e)}")
+            logger.error(f"Search failed: {str(e)}")
             return []
         finally:
             session.close()
