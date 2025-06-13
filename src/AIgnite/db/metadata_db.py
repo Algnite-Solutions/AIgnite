@@ -32,6 +32,7 @@ class TableSchema(Base):
     extra_metadata = Column(JSON)  # Store metadata dict
     pdf_path = Column(String)
     HTML_path = Column(String, nullable=True)
+    blog = Column(Text, nullable=True)  # New field for long text blog
     
     # Add tsvector column for full-text search
     __table_args__ = (
@@ -66,7 +67,8 @@ class TableSchema(Base):
             table_ids=[chunk.id for chunk in docset.table_chunks],
             extra_metadata=docset.metadata,
             pdf_path=docset.pdf_path,
-            HTML_path=docset.HTML_path
+            HTML_path=docset.HTML_path,
+            blog=getattr(docset, 'blog', None)  # Support blog field if present
         )
     
     def to_dict(self) -> Dict[str, Any]:
@@ -85,7 +87,8 @@ class TableSchema(Base):
             'chunk_ids': self.chunk_ids,
             'figure_ids': self.figure_ids,
             'table_ids': self.table_ids,
-            'metadata': self.extra_metadata
+            'metadata': self.extra_metadata,
+            'blog': self.blog  # Include blog field in output
         }
 
 class MetadataDB:
@@ -265,7 +268,8 @@ class MetadataDB:
                 table_ids=metadata.get('table_ids', []),
                 extra_metadata=metadata.get('metadata', {}),
                 pdf_path=pdf_path,
-                HTML_path=metadata.get('HTML_path')
+                HTML_path=metadata.get('HTML_path'),
+                blog=getattr(metadata, 'blog', None)  # Support blog field if present
             )
             session.add(paper)
             session.commit()
@@ -348,5 +352,49 @@ class MetadataDB:
             session.rollback()
             logging.error(f"Failed to delete paper {doc_id}: {str(e)}")
             return False
+        finally:
+            session.close()
+
+    def save_blog(self, doc_id: str, blog: str) -> bool:
+        """Save or update the blog text for a given document ID.
+        
+        Args:
+            doc_id: Document ID
+            blog: Blog text to save
+        Returns:
+            True if successful, False otherwise
+        """
+        session = self.Session()
+        try:
+            paper = session.query(TableSchema).filter_by(doc_id=doc_id).first()
+            if not paper:
+                return False
+            paper.blog = blog
+            session.commit()
+            return True
+        except Exception as e:
+            session.rollback()
+            logging.error(f"Failed to save blog for doc_id {doc_id}: {str(e)}")
+            return False
+        finally:
+            session.close()
+
+    def get_blog(self, doc_id: str) -> Optional[str]:
+        """Retrieve the blog text for a given document ID.
+        
+        Args:
+            doc_id: Document ID
+        Returns:
+            Blog text if found, None otherwise
+        """
+        session = self.Session()
+        try:
+            paper = session.query(TableSchema).filter_by(doc_id=doc_id).first()
+            if not paper:
+                return None
+            return paper.blog
+        except Exception as e:
+            logging.error(f"Failed to get blog for doc_id {doc_id}: {str(e)}")
+            return None
         finally:
             session.close() 
