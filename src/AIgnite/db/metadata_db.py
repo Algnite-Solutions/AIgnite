@@ -164,7 +164,6 @@ class MetadataDB:
                 SELECT plainto_tsquery('english', :query) as parsed_query
             """), {'query': query}).scalar()
             logger.debug(f"Parsed query: {debug_query}")
-
             # Use OR (|) between words for more forgiving matching
             or_query = ' | '.join(query.split())
 
@@ -204,7 +203,6 @@ class MetadataDB:
                 'cutoff': similarity_cutoff,
                 'limit': top_k
             })
-            
             # Debug the results
             results = []
             for row in search_results:
