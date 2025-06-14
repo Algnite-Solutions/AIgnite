@@ -272,6 +272,20 @@ class ToyMetadataDB(MetadataDB):
             logger.error(f"Search failed: {str(e)}")
             return []
 
+    def add_blog(self, doc_id: str, blog: str) -> bool:
+        """Save or update the blog text for a given document ID in memory."""
+        if doc_id not in self.metadata:
+            return False
+        self.metadata[doc_id]['blog'] = blog
+        return True
+
+    def get_blog(self, doc_id: str) -> Optional[str]:
+        """Retrieve the blog text for a given document ID from memory."""
+        meta = self.metadata.get(doc_id)
+        if not meta:
+            return None
+        return meta.get('blog')
+
 class ToyImageDB(MinioImageDB):
     """A toy image database for testing that stores everything in memory."""
     def __init__(self, endpoint: str, access_key: str, secret_key: str, 
