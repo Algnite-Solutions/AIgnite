@@ -91,7 +91,9 @@ class TableSchema(Base):
             'figure_ids': self.figure_ids,
             'table_ids': self.table_ids,
             'metadata': self.extra_metadata,
-            'blog': self.blog  # Include blog field in output
+            'blog': self.blog,  # Include blog field in output
+            'pdf_path': self.pdf_path,  # Add pdf_path
+            'HTML_path': self.HTML_path  # Add HTML_path
         }
 
 class MetadataDB:
@@ -163,7 +165,10 @@ class MetadataDB:
             """), {'query': query}).scalar()
             logger.debug(f"Parsed query: {debug_query}")
 
-            # Modified search query with new fts_rank signature
+            # Use OR (|) between words for more forgiving matching
+            or_query = ' | '.join(query.split())
+
+            # Modified search query with to_tsquery for OR logic
             search_results = session.execute(text("""
                 WITH search_results AS (
                     SELECT
@@ -195,11 +200,11 @@ class MetadataDB:
                 ORDER BY score DESC
                 LIMIT :limit
             """), {
-                'query': ' & '.join(query.split()),  # Convert space-separated terms to &-separated
+                'query': or_query,  # Use OR between words
                 'cutoff': similarity_cutoff,
                 'limit': top_k
             })
-
+            
             # Debug the results
             results = []
             for row in search_results:

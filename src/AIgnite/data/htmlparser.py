@@ -94,10 +94,10 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
 
         search = arxiv.Search(
             query=query,
-            max_results=None,  # You can set max papers you want here
+            max_results=3,  # You can set max papers you want here
             sort_by=arxiv.SortCriterion.SubmittedDate
         )
-
+        print('only 3 papers')
         print(f"grabbing arXiv papers in cs.* submitted from {self.start_time} to {self.end_time}......")
 
         # Test if we have extracted already or not. Download pdf and try to download html
