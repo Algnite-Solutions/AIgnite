@@ -330,6 +330,35 @@ class TestPaperIndexerWithToyDBs(unittest.TestCase):
         self.assertTrue(all(r["title"] != paper.title for r in results))
         print("✅ Deletion verification complete.")
 
+    def test_6_save_and_get_blog(self):
+        """Test saving and retrieving blog text for a paper via the indexer's metadata_db."""
+        # Pick a paper to test
+        paper = self.test_papers[0]
+        doc_id = paper.doc_id
+
+        # Ensure the paper exists in the DB (re-add if necessary)
+        self.indexer.metadata_db.save_paper(doc_id, paper.pdf_path, paper.__dict__)
+
+        # Save a blog
+        blog_text = "This is a blog post about the paper."
+        result = self.indexer.metadata_db.add_blog(doc_id, blog_text)
+        self.assertTrue(result)
+
+        # Retrieve the blog
+        retrieved_blog = self.indexer.metadata_db.get_blog(doc_id)
+        self.assertEqual(retrieved_blog, blog_text)
+
+        # Update the blog
+        updated_blog = "This is an updated blog post."
+        result = self.indexer.metadata_db.add_blog(doc_id, updated_blog)
+        self.assertTrue(result)
+        retrieved_blog = self.indexer.metadata_db.get_blog(doc_id)
+        self.assertEqual(retrieved_blog, updated_blog)
+
+        # Try to get blog for non-existent paper
+        non_existent_blog = self.indexer.metadata_db.get_blog("nonexistent_doc")
+        self.assertIsNone(non_existent_blog)
+
     @classmethod
     def tearDownClass(cls):
         """Clean up test data."""

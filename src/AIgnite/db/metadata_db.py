@@ -9,6 +9,9 @@ import logging
 import os
 from ..data.docset import DocSet, BaseModel, Field
 
+# Set up logging
+logger = logging.getLogger(__name__)
+
 Base = declarative_base()
 
 class TableSchema(Base):
@@ -32,6 +35,7 @@ class TableSchema(Base):
     extra_metadata = Column(JSON)  # Store metadata dict
     pdf_path = Column(String)
     HTML_path = Column(String, nullable=True)
+    blog = Column(Text, nullable=True)  # New field for long text blog
     
     # Add tsvector column for full-text search
     __table_args__ = (
@@ -66,7 +70,8 @@ class TableSchema(Base):
             table_ids=[chunk.id for chunk in docset.table_chunks],
             extra_metadata=docset.metadata,
             pdf_path=docset.pdf_path,
-            HTML_path=docset.HTML_path
+            HTML_path=docset.HTML_path,
+            blog=getattr(docset, 'blog', None)  # Support blog field if present
         )
     
     def to_dict(self) -> Dict[str, Any]:
@@ -85,7 +90,10 @@ class TableSchema(Base):
             'chunk_ids': self.chunk_ids,
             'figure_ids': self.figure_ids,
             'table_ids': self.table_ids,
-            'metadata': self.extra_metadata
+            'metadata': self.extra_metadata,
+            'blog': self.blog,  # Include blog field in output
+            'pdf_path': self.pdf_path,  # Add pdf_path
+            'HTML_path': self.HTML_path  # Add HTML_path
         }
 
 class MetadataDB:
@@ -115,7 +123,8 @@ class MetadataDB:
             # Create a custom ranking function that combines ts_rank_cd with document weights
             session.execute(text("""
                 CREATE OR REPLACE FUNCTION fts_rank(
-                    v tsvector,
+                    title text,
+                    abstract text,
                     q tsquery,
                     title_weight float DEFAULT 0.7,
                     abstract_weight float DEFAULT 0.3
@@ -147,19 +156,18 @@ class MetadataDB:
         top_k: int = 10,
         similarity_cutoff: float = 0.1
     ) -> List[Dict[str, Any]]:
-        """Search papers using PostgreSQL full-text search.
-        
-        Args:
-            query: Search query string
-            top_k: Maximum number of results to return
-            similarity_cutoff: Minimum similarity score (0-1) to include in results
-            
-        Returns:
-            List of paper metadata dictionaries with search scores
-        """
+        """Search papers using PostgreSQL full-text search."""
         session = self.Session()
         try:
-            # Convert query to tsquery and perform search
+            # First, let's debug the query parsing
+            debug_query = session.execute(text("""
+                SELECT plainto_tsquery('english', :query) as parsed_query
+            """), {'query': query}).scalar()
+            logger.debug(f"Parsed query: {debug_query}")
+            # Use OR (|) between words for more forgiving matching
+            or_query = ' | '.join(query.split())
+
+            # Modified search query with to_tsquery for OR logic
             search_results = session.execute(text("""
                 WITH search_results AS (
                     SELECT
@@ -171,18 +179,19 @@ class MetadataDB:
                         published_date,
                         extra_metadata as metadata,
                         fts_rank(
-                            to_tsvector('english', coalesce(title, '') || ' ' || coalesce(abstract, '')),
-                            plainto_tsquery('english', :query)
+                            title,
+                            abstract,
+                            to_tsquery('english', :query)
                         ) as score,
                         ts_headline(
                             'english',
                             coalesce(title, '') || ' ' || coalesce(abstract, ''),
-                            plainto_tsquery('english', :query),
+                            to_tsquery('english', :query),
                             'StartSel=<mark>, StopSel=</mark>, MaxWords=50, MinWords=20'
                         ) as headline
                     FROM papers
                     WHERE to_tsvector('english', coalesce(title, '') || ' ' || coalesce(abstract, '')) @@ 
-                          plainto_tsquery('english', :query)
+                          to_tsquery('english', :query)
                 )
                 SELECT *
                 FROM search_results
@@ -190,11 +199,11 @@ class MetadataDB:
                 ORDER BY score DESC
                 LIMIT :limit
             """), {
-                'query': query,
+                'query': or_query,  # Use OR between words
                 'cutoff': similarity_cutoff,
                 'limit': top_k
             })
-            
+            # Debug the results
             results = []
             for row in search_results:
                 result_dict = {
@@ -211,11 +220,12 @@ class MetadataDB:
                     'matched_text': row.headline
                 }
                 results.append(result_dict)
-                
+                logger.debug(f"Found result: {result_dict['doc_id']} with score {result_dict['score']}")
+
             return results
-            
+
         except Exception as e:
-            logging.error(f"Search failed: {str(e)}")
+            logger.error(f"Search failed: {str(e)}")
             return []
         finally:
             session.close()
@@ -265,7 +275,8 @@ class MetadataDB:
                 table_ids=metadata.get('table_ids', []),
                 extra_metadata=metadata.get('metadata', {}),
                 pdf_path=pdf_path,
-                HTML_path=metadata.get('HTML_path')
+                HTML_path=metadata.get('HTML_path'),
+                blog=getattr(metadata, 'blog', None)  # Support blog field if present
             )
             session.add(paper)
             session.commit()
@@ -348,5 +359,49 @@ class MetadataDB:
             session.rollback()
             logging.error(f"Failed to delete paper {doc_id}: {str(e)}")
             return False
+        finally:
+            session.close()
+
+    def save_blog(self, doc_id: str, blog: str) -> bool:
+        """Save or update the blog text for a given document ID.
+        
+        Args:
+            doc_id: Document ID
+            blog: Blog text to save
+        Returns:
+            True if successful, False otherwise
+        """
+        session = self.Session()
+        try:
+            paper = session.query(TableSchema).filter_by(doc_id=doc_id).first()
+            if not paper:
+                return False
+            paper.blog = blog
+            session.commit()
+            return True
+        except Exception as e:
+            session.rollback()
+            logging.error(f"Failed to save blog for doc_id {doc_id}: {str(e)}")
+            return False
+        finally:
+            session.close()
+
+    def get_blog(self, doc_id: str) -> Optional[str]:
+        """Retrieve the blog text for a given document ID.
+        
+        Args:
+            doc_id: Document ID
+        Returns:
+            Blog text if found, None otherwise
+        """
+        session = self.Session()
+        try:
+            paper = session.query(TableSchema).filter_by(doc_id=doc_id).first()
+            if not paper:
+                return None
+            return paper.blog
+        except Exception as e:
+            logging.error(f"Failed to get blog for doc_id {doc_id}: {str(e)}")
+            return None
         finally:
             session.close() 
