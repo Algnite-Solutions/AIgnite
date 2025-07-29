@@ -153,21 +153,108 @@ class Qwen72BAgent(BaseGenerator):
         full_prompt = f"<system>{system_prompt}</system><user>{task_description}</user>"
         return self.generate_response(full_prompt)
 
-if __name__ == "__main__":
-    agent = Qwen72BAgent(
-        data_path="../imgs",
-        output_path="/data3/guofang/peirongcan/generator-dev/blogs"
-    )
+class Qwen3_32B(BaseGenerator):
+    def __init__(self, model_name = "Qwen/Qwen3-32B", data_path="./output", output_path="./experiments/output"):
 
+        self.data_path = data_path
+        self.output_path = output_path
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            torch_dtype="auto",
+            device_map="auto"
+        )
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    def generate_digest(self, papers: List[DocSet]):
+        """实现抽象方法 - 为多篇论文生成博客摘要"""
+        for paper in papers:
+            self._generate_single_blog(paper)
+
+    def _generate_single_blog(self, paper: DocSet):
+        """为单篇论文生成博客"""
+        arxiv_id = paper.doc_id
+        text = paper.text_chunks
+
+        img_path = f"{self.data_path}/{arxiv_id}_FigureX.png"
+        prompt = f"""
+        您正在基于原始论文生成一篇带有 arXiv 编号 {arxiv_id} 的 Markdown 格式中文博客文章，旨在为该领域的研究人员提供该论文的概要。风格类似于媒体科学博客。
+
+        在您的博客中，您必须引用论文中的**几个最重要的图表**来帮助理解，尤其是概述工作框架的图。对于每个选定的图表，将其渲染为独立的 Markdown 图片：
+            ![图表 X: 简短说明]({img_path})
+
+        请勿使用类似“如图2所示”的行内图表引用。请勿引用表格。
+        直接从博客标题开始。
+
+        请使用适当的小标题对文章内容进行分隔。包括但不限于：
+        背景介绍
+        问题背景
+        工作贡献
+        方法
+        实验
+        结论
+        参考文献
+        等等···
+
+        原始论文如下：
+        {text}
+        """
+        
+        content = self.speak(prompt)
+        
+        # 保存生成的博客
+        markdown_path = os.path.join(self.output_path, f"{arxiv_id}.md")
+        os.makedirs(os.path.dirname(markdown_path), exist_ok=True)
+        
+        with open(markdown_path, "w", encoding="utf-8") as md_file:
+            md_file.write(content)
+        
+        print(f"✅ Markdown file saved to {markdown_path}")
+
+    def speak(self, prompt):
+        messages = [
+            {"role": "user", "content": prompt},
+        ]
+        text = self.tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+            enable_thinking=False, # Switches between thinking and non-thinking modes. Default is True.
+        )
+        model_inputs = self.tokenizer([text], return_tensors="pt").to(self.model.device)
+
+        # conduct text completion
+        generated_ids = self.model.generate(
+            **model_inputs,
+            max_new_tokens=32768
+        )
+        output_ids = generated_ids[0][len(model_inputs.input_ids[0]):].tolist() 
+
+        # parse thinking content
+        try:
+            # rindex finding 151668 (</think>)
+            index = len(output_ids) - output_ids[::-1].index(151668)
+        except ValueError:
+            index = 0
+
+        #thinking_content = self.tokenizer.decode(output_ids[:index], skip_special_tokens=True).strip("\n")
+        content = self.tokenizer.decode(output_ids[index:], skip_special_tokens=True).strip("\n")
+
+        #print("thinking content:", thinking_content)
+        #print("content:", content)
+        return content
+
+
+if __name__ == "__main__":
     # 从 JSON 文件读取 DocSet 数据
     dummy_json_path = "/data3/guofang/peirongcan/AIgnite/src/AIgnite/dummy_data/dummy.json"
     with open(dummy_json_path, "r", encoding="utf-8") as f:
         docset_data = json.load(f)
-
     # 如果 dummy.json 是单个 DocSet
     dummy_paper = DocSet.parse_obj(docset_data)
+    
+    agent = Qwen3_32B(
+        data_path="/data3/guofang/peirongcan/PaperIgnition/orchestrator/imgs",
+        output_path="/data3/guofang/peirongcan/AIgnite/src/AIgnite/dummy_data"
+    )
+    
     agent._generate_single_blog(dummy_paper)
-
-    # 如果 dummy.json 是 DocSet 列表
-    # papers = [DocSet.parse_obj(item) for item in docset_data]
-    # agent.generate_digest(papers)
