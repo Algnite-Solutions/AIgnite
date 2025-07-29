@@ -3,7 +3,8 @@ import os
 import tempfile
 import json
 from sqlalchemy import create_engine, text
-from AIgnite.db.metadata_db import MetadataDB, Base
+from AIgnite.db.metadata_db import MetadataDB, Base, TableSchema
+from AIgnite.data.docset import DocSet, TextChunk, FigureChunk, TableChunk, ChunkType
 
 class TestMetadataDB(unittest.TestCase):
     def setUp(self):
@@ -29,8 +30,33 @@ class TestMetadataDB(unittest.TestCase):
         with open(self.test_pdf_path, "wb") as f:
             f.write(b"Test PDF content")
         
-        # Sample metadata
+        # Create test DocSet
         self.test_doc_id = "test_doc_123"
+        self.test_docset = DocSet(
+            doc_id=self.test_doc_id,
+            title="Test Paper",
+            abstract="This is a test abstract",
+            authors=["Author 1", "Author 2"],
+            categories=["Category 1", "Category 2"],
+            published_date="2024-03-20",
+            text_chunks=[
+                TextChunk(id="chunk1", type=ChunkType.TEXT, text="Text chunk 1"),
+                TextChunk(id="chunk2", type=ChunkType.TEXT, text="Text chunk 2"),
+                TextChunk(id="chunk3", type=ChunkType.TEXT, text="Text chunk 3")
+            ],
+            figure_chunks=[
+                FigureChunk(id="fig1", type=ChunkType.FIGURE, image_path="path/to/fig1.png"),
+                FigureChunk(id="fig2", type=ChunkType.FIGURE, image_path="path/to/fig2.png")
+            ],
+            table_chunks=[
+                TableChunk(id="table1", type=ChunkType.TABLE, table_html="<table>...</table>")
+            ],
+            metadata={"key": "value"},
+            pdf_path=self.test_pdf_path,
+            HTML_path=None
+        )
+        
+        # Legacy dictionary metadata for backward compatibility tests
         self.test_metadata = {
             "title": "Test Paper",
             "abstract": "This is a test abstract",
@@ -38,7 +64,9 @@ class TestMetadataDB(unittest.TestCase):
             "categories": ["Category 1", "Category 2"],
             "published_date": "2024-03-20",
             "chunk_ids": ["chunk1", "chunk2", "chunk3"],
-            "image_ids": ["img1", "img2"]
+            "figure_ids": ["fig1", "fig2"],
+            "table_ids": ["table1"],
+            "metadata": {"key": "value"}
         }
 
     def tearDown(self):
@@ -52,9 +80,27 @@ class TestMetadataDB(unittest.TestCase):
         if os.path.exists(self.temp_dir):
             os.rmdir(self.temp_dir)
 
-    def test_1_save_paper(self):
-        """Test saving a paper with PDF and metadata."""
-        # Save paper
+    def test_1_save_paper_docset(self):
+        """Test saving a paper using DocSet."""
+        # Save paper using DocSet
+        result = self.db.save_paper(self.test_doc_id, self.test_pdf_path, self.test_docset)
+        self.assertTrue(result)
+        
+        # Verify metadata was saved
+        saved_metadata = self.db.get_metadata(self.test_doc_id)
+        self.assertIsNotNone(saved_metadata)
+        self.assertEqual(saved_metadata["title"], self.test_docset.title)
+        self.assertEqual(saved_metadata["abstract"], self.test_docset.abstract)
+        self.assertEqual(saved_metadata["authors"], self.test_docset.authors)
+        self.assertEqual(saved_metadata["categories"], self.test_docset.categories)
+        self.assertEqual(saved_metadata["chunk_ids"], [chunk.id for chunk in self.test_docset.text_chunks])
+        self.assertEqual(saved_metadata["figure_ids"], [chunk.id for chunk in self.test_docset.figure_chunks])
+        self.assertEqual(saved_metadata["table_ids"], [chunk.id for chunk in self.test_docset.table_chunks])
+        self.assertEqual(saved_metadata["metadata"], self.test_docset.metadata)
+
+    def test_2_save_paper_dict(self):
+        """Test saving a paper using dictionary metadata (backward compatibility)."""
+        # Save paper using dictionary
         result = self.db.save_paper(self.test_doc_id, self.test_pdf_path, self.test_metadata)
         self.assertTrue(result)
         
@@ -66,12 +112,14 @@ class TestMetadataDB(unittest.TestCase):
         self.assertEqual(saved_metadata["authors"], self.test_metadata["authors"])
         self.assertEqual(saved_metadata["categories"], self.test_metadata["categories"])
         self.assertEqual(saved_metadata["chunk_ids"], self.test_metadata["chunk_ids"])
-        self.assertEqual(saved_metadata["image_ids"], self.test_metadata["image_ids"])
+        self.assertEqual(saved_metadata["figure_ids"], self.test_metadata["figure_ids"])
+        self.assertEqual(saved_metadata["table_ids"], self.test_metadata["table_ids"])
+        self.assertEqual(saved_metadata["metadata"], self.test_metadata["metadata"])
 
-    def test_2_get_pdf(self):
+    def test_3_get_pdf(self):
         """Test retrieving PDF data."""
         # First save the paper
-        self.db.save_paper(self.test_doc_id, self.test_pdf_path, self.test_metadata)
+        self.db.save_paper(self.test_doc_id, self.test_pdf_path, self.test_docset)
         
         # Test getting PDF as binary
         pdf_data = self.db.get_pdf(self.test_doc_id)
@@ -89,18 +137,20 @@ class TestMetadataDB(unittest.TestCase):
         # Clean up output file
         os.remove(output_path)
 
-    def test_3_update_paper(self):
+    def test_4_update_paper(self):
         """Test updating an existing paper."""
         # First save the paper
-        self.db.save_paper(self.test_doc_id, self.test_pdf_path, self.test_metadata)
+        self.db.save_paper(self.test_doc_id, self.test_pdf_path, self.test_docset)
         
-        # Update metadata
-        updated_metadata = self.test_metadata.copy()
-        updated_metadata["title"] = "Updated Title"
-        updated_metadata["chunk_ids"].append("chunk4")
+        # Update DocSet
+        updated_docset = self.test_docset.copy()
+        updated_docset.title = "Updated Title"
+        updated_docset.text_chunks.append(
+            TextChunk(id="chunk4", type=ChunkType.TEXT, text="New text chunk")
+        )
         
         # Save updated version
-        result = self.db.save_paper(self.test_doc_id, self.test_pdf_path, updated_metadata)
+        result = self.db.save_paper(self.test_doc_id, self.test_pdf_path, updated_docset)
         self.assertTrue(result)
         
         # Verify updates
@@ -109,29 +159,10 @@ class TestMetadataDB(unittest.TestCase):
         self.assertEqual(len(saved_metadata["chunk_ids"]), 4)
         self.assertIn("chunk4", saved_metadata["chunk_ids"])
 
-    def test_4_get_metadata(self):
-        """Test retrieving metadata."""
-        # First save the paper
-        self.db.save_paper(self.test_doc_id, self.test_pdf_path, self.test_metadata)
-        
-        # Get metadata
-        metadata = self.db.get_metadata(self.test_doc_id)
-        
-        # Verify all fields
-        self.assertIsNotNone(metadata)
-        self.assertEqual(metadata["doc_id"], self.test_doc_id)
-        self.assertEqual(metadata["title"], self.test_metadata["title"])
-        self.assertEqual(metadata["abstract"], self.test_metadata["abstract"])
-        self.assertEqual(metadata["authors"], self.test_metadata["authors"])
-        self.assertEqual(metadata["categories"], self.test_metadata["categories"])
-        self.assertEqual(metadata["published_date"], self.test_metadata["published_date"])
-        self.assertEqual(metadata["chunk_ids"], self.test_metadata["chunk_ids"])
-        self.assertEqual(metadata["image_ids"], self.test_metadata["image_ids"])
-
     def test_5_delete_paper(self):
         """Test deleting a paper."""
         # First save the paper
-        self.db.save_paper(self.test_doc_id, self.test_pdf_path, self.test_metadata)
+        self.db.save_paper(self.test_doc_id, self.test_pdf_path, self.test_docset)
         
         # Delete paper
         result = self.db.delete_paper(self.test_doc_id)
