@@ -213,16 +213,16 @@ class VectorDB:
             logger.error(f"Failed to add document {doc_id} to vector database: {str(e)}")
             return False
 
-    def search(
+    def search_documents(
         self,
         query: str,
-        k: int = 5
+        top_k: int = 5
     ) -> List[Tuple[VectorEntry, float]]:
-        """Search for similar vectors.
+        """Search for similar documents.
         
         Args:
             query: Search query text
-            k: Number of results to return
+            top_k: Number of results to return
             
         Returns:
             List of tuples containing (VectorEntry, similarity_score)
@@ -235,7 +235,7 @@ class VectorDB:
             query_vector = self._get_embedding(query)
             
             # Search index with more results to account for deduplication
-            k_search = min(k * 3, len(self.entries))  # Search for more results initially
+            k_search = min(top_k * 3, len(self.entries))  # Search for more results initially
             distances, indices = self.index.search(
                 query_vector,
                 k=k_search
@@ -259,13 +259,13 @@ class VectorDB:
                 seen_doc_ids.add(entry.doc_id)
                 
                 # Break if we have enough unique documents
-                if len(results) >= k:
+                if len(results) >= top_k:
                     break
             
             # Sort by similarity score (higher is better for inner product)
             results.sort(key=lambda x: x[1], reverse=True)
             
-            return results[:k]
+            return results[:top_k]
             
         except Exception as e:
             logging.error(f"Failed to search vector database: {str(e)}")

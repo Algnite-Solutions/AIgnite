@@ -63,8 +63,8 @@ class VectorSearchStrategy(SearchStrategy):
         **kwargs
     ) -> List[SearchResult]:
         try:
-            # Use vector_db's search implementation which uses FAISS
-            vector_results = self.vector_db.search(query, k=top_k)
+            # Use vector_db's search_documents implementation which uses FAISS
+            vector_results = self.vector_db.search_documents(query, top_k=top_k)
             
             # Process results
             results = []
@@ -108,8 +108,8 @@ class TFIDFSearchStrategy(SearchStrategy):
         **kwargs
     ) -> List[SearchResult]:
         try:
-            # Use metadata_db's search implementation
-            search_results = self.metadata_db.search_papers(
+            # Use metadata_db's search_documents implementation
+            search_results = self.metadata_db.search_documents(
                 query=query,
                 top_k=top_k,
                 similarity_cutoff=similarity_cutoff

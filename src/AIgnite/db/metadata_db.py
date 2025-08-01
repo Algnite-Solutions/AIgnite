@@ -150,13 +150,13 @@ class MetadataDB:
         finally:
             session.close()
 
-    def search_papers(
+    def search_documents(
         self,
         query: str,
         top_k: int = 10,
         similarity_cutoff: float = 0.1
     ) -> List[Dict[str, Any]]:
-        """Search papers using PostgreSQL full-text search."""
+        """Search documents using PostgreSQL full-text search."""
         session = self.Session()
         try:
             # First, let's debug the query parsing
@@ -230,18 +230,15 @@ class MetadataDB:
         finally:
             session.close()
 
-    def save_paper(self, doc_id: str, pdf_path: str, metadata: Dict[str, Any]) -> bool:
-        """Save paper PDF and metadata.
-        
+    def add_document(self, doc_id: str, pdf_path: str, metadata: Dict[str, Any]) -> bool:
+        """Add a document PDF and metadata.
         Args:
             doc_id: Document ID
             pdf_path: Path to PDF file
-            metadata: Dictionary containing paper metadata with required fields:
+            metadata: Dictionary containing document metadata with required fields:
                      title, abstract, authors, categories, published_date
-            
         Returns:
             True if successful, False if doc_id already exists or on error
-            
         Raises:
             ValueError: If required metadata fields are missing
         """
@@ -252,17 +249,17 @@ class MetadataDB:
             
         session = self.Session()
         try:
-            # Check if paper already exists
+            # Check if document already exists
             if session.query(TableSchema).filter_by(doc_id=doc_id).first():
-                logging.warning(f"Paper {doc_id} already exists. Skip saving.")
+                logging.warning(f"Document {doc_id} already exists. Skip saving.")
                 return False
 
             # Read PDF binary data
             with open(pdf_path, 'rb') as pdf_file:
                 pdf_data = pdf_file.read()
 
-            # Create new paper
-            paper = TableSchema(
+            # Create new document
+            document = TableSchema(
                 doc_id=doc_id,
                 title=metadata['title'],
                 abstract=metadata['abstract'],
@@ -278,86 +275,80 @@ class MetadataDB:
                 HTML_path=metadata.get('HTML_path'),
                 blog=getattr(metadata, 'blog', None)  # Support blog field if present
             )
-            session.add(paper)
+            session.add(document)
             session.commit()
             return True
         except Exception as e:
             session.rollback()
-            logging.error(f"Failed to save paper {doc_id}: {str(e)}")
+            logging.error(f"Failed to save document {doc_id}: {str(e)}")
             return False
         finally:
             session.close()
 
-    def get_metadata(self, doc_id: str) -> Optional[Dict[str, Any]]:
+    def get_document(self, doc_id: str) -> Optional[Dict[str, Any]]:
         """Retrieve metadata for a document.
-        
         Args:
             doc_id: Document ID
-            
         Returns:
             Dictionary containing metadata or None if not found
         """
         session = self.Session()
         try:
-            paper = session.query(TableSchema).filter_by(doc_id=doc_id).first()
-            if not paper:
+            document = session.query(TableSchema).filter_by(doc_id=doc_id).first()
+            if not document:
                 return None
-            return paper.to_dict()
+            return document.to_dict()
         except Exception as e:
             logging.error(f"Failed to get metadata for doc_id {doc_id}: {str(e)}")
             return None
         finally:
             session.close()
 
-    def get_pdf(self, doc_id: str, save_path: str = None) -> Optional[bytes]:
+    def get_document_pdf(self, doc_id: str, save_path: str = None) -> Optional[bytes]:
         """Retrieve PDF data for a document.
-        
         Args:
             doc_id: Document ID
             save_path: Optional path to save the PDF file
-            
         Returns:
             PDF binary data if save_path is None, else None
         """
         session = self.Session()
         try:
-            paper = session.query(TableSchema).filter_by(doc_id=doc_id).first()
-            if not paper or not paper.pdf_data:
+            document = session.query(TableSchema).filter_by(doc_id=doc_id).first()
+            if not document or not document.pdf_data:
                 return None
 
             if save_path:
                 os.makedirs(os.path.dirname(save_path), exist_ok=True)
                 with open(save_path, 'wb') as f:
-                    f.write(paper.pdf_data)
+                    f.write(document.pdf_data)
                 return None
-            return paper.pdf_data
+            return document.pdf_data
         except Exception as e:
             logging.error(f"Failed to get PDF for doc_id {doc_id}: {str(e)}")
             return None
         finally:
             session.close()
 
-    def delete_paper(self, doc_id: str) -> bool:
-        """Delete paper and its metadata.
-        
+    def delete_document(self, doc_id: str) -> bool:
+        """Delete document and its metadata.
         Args:
             doc_id: Document ID
-            
         Returns:
             True if successful, False otherwise
         """
         session = self.Session()
         try:
-            paper = session.query(TableSchema).filter_by(doc_id=doc_id).first()
-            if not paper:
+            document = session.query(TableSchema).filter_by(doc_id=doc_id).first()
+            if not document:
                 return False
             
-            session.delete(paper)
+            session.delete(document)
             session.commit()
             return True
         except Exception as e:
             session.rollback()
-            logging.error(f"Failed to delete paper {doc_id}: {str(e)}")
+            logging.error(f"Failed to delete document {doc_id}: {str(e)}")
             return False
         finally:
             session.close()
@@ -373,10 +364,10 @@ class MetadataDB:
         """
         session = self.Session()
         try:
-            paper = session.query(TableSchema).filter_by(doc_id=doc_id).first()
-            if not paper:
+            document = session.query(TableSchema).filter_by(doc_id=doc_id).first()
+            if not document:
                 return False
-            paper.blog = blog
+            document.blog = blog
             session.commit()
             return True
         except Exception as e:
@@ -396,10 +387,10 @@ class MetadataDB:
         """
         session = self.Session()
         try:
-            paper = session.query(TableSchema).filter_by(doc_id=doc_id).first()
-            if not paper:
+            document = session.query(TableSchema).filter_by(doc_id=doc_id).first()
+            if not document:
                 return None
-            return paper.blog
+            return document.blog
         except Exception as e:
             logging.error(f"Failed to get blog for doc_id {doc_id}: {str(e)}")
             return None
