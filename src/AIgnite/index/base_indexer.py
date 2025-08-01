@@ -4,13 +4,16 @@ from ..data.docset import DocSet
 
 class BaseIndexer(ABC):
     @abstractmethod
-    def index_papers(self, papers: List[DocSet]):
+    def index_papers(self, documents: List[DocSet]):
+        """Index a list of documents."""
         pass
 
     @abstractmethod
-    def get_paper_metadata(self, arxiv_id: str) -> Optional[dict]:
+    def get_paper_metadata(self, doc_id: str) -> Optional[dict]:
+        """Retrieve metadata for a specific document."""
         pass
 
     @abstractmethod
-    def find_similar_papers(self, query_embedding: List[float], top_k: int = 5, filters: dict = None) -> List[dict]:
+    def find_similar_papers(self, query: str, top_k: int = 5, filters: dict = None) -> List[dict]:
+        """Find documents similar to the query."""
         pass

@@ -188,7 +188,7 @@ class ToyMetadataDB(MetadataDB):
         self.metadata = {}  # doc_id -> metadata
         self.pdfs = {}      # doc_id -> pdf_content
         
-    def save_paper(self, doc_id: str, pdf_path: str, metadata: Dict[str, Any]) -> bool:
+    def add_document(self, doc_id: str, pdf_path: str, metadata: Dict[str, Any]) -> bool:
         """Store paper metadata and PDF content in memory."""
         try:
             # Read and store PDF content
@@ -200,11 +200,11 @@ class ToyMetadataDB(MetadataDB):
         except Exception:
             return False
         
-    def get_metadata(self, doc_id: str) -> Optional[Dict[str, Any]]:
+    def get_document(self, doc_id: str) -> Optional[Dict[str, Any]]:
         """Retrieve metadata for a document."""
         return self.metadata.get(doc_id)
         
-    def get_pdf(self, doc_id: str, save_path: Optional[str] = None) -> Optional[bytes]:
+    def get_document_pdf(self, doc_id: str, save_path: Optional[str] = None) -> Optional[bytes]:
         """Retrieve PDF content for a document."""
         pdf_data = self.pdfs.get(doc_id)
         if pdf_data and save_path:
@@ -214,7 +214,7 @@ class ToyMetadataDB(MetadataDB):
             return None
         return pdf_data
         
-    def delete_paper(self, doc_id: str) -> bool:
+    def delete_document(self, doc_id: str) -> bool:
         """Delete paper metadata and PDF content."""
         if doc_id in self.metadata:
             del self.metadata[doc_id]
@@ -223,7 +223,7 @@ class ToyMetadataDB(MetadataDB):
             return True
         return False
 
-    def search_papers(
+    def search_documents(
         self,
         query: str,
         top_k: int = 10,

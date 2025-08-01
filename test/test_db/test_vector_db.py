@@ -142,12 +142,12 @@ class TestVectorDB(unittest.TestCase):
         
         # Test different queries
         test_queries = [
-            ("machine learning AI applications", "2106.14834"),  # Should match ML paper
-            ("natural language processing transformers", "2106.14835"),  # Should match NLP paper
+            ("machine learning AI applications", "2106.14834"),  # Should match ML document
+            ("natural language processing transformers", "2106.14835"),  # Should match NLP document
         ]
         
         for query, expected_doc_id in test_queries:
-            results = self.vector_db.search(query, k=5)
+            results = self.vector_db.search_documents(query, top_k=5)
             self.assertTrue(len(results) > 0)
             entry, score = results[0]
             self.assertEqual(entry.doc_id, expected_doc_id)
