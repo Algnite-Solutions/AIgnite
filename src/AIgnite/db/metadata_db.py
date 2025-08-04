@@ -154,7 +154,8 @@ class MetadataDB:
         self,
         query: str,
         top_k: int = 10,
-        similarity_cutoff: float = 0.1
+        similarity_cutoff: float = 0.1,
+        filters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """Search papers using PostgreSQL full-text search."""
         session = self.Session()
@@ -167,8 +168,18 @@ class MetadataDB:
             # Use OR (|) between words for more forgiving matching
             or_query = ' | '.join(query.split())
 
+            # Build WHERE clause for filters
+            where_clause = "to_tsvector('english', coalesce(title, '') || ' ' || coalesce(abstract, '')) @@ to_tsquery('english', :query)"
+            filter_params = {'query': or_query, 'cutoff': similarity_cutoff, 'limit': top_k}
+            
+            if filters and "doc_ids" in filters:
+                doc_ids = filters["doc_ids"]
+                if doc_ids:
+                    placeholders = ','.join([f"'{doc_id}'" for doc_id in doc_ids])
+                    where_clause += f" AND doc_id IN ({placeholders})"
+
             # Modified search query with to_tsquery for OR logic
-            search_results = session.execute(text("""
+            search_results = session.execute(text(f"""
                 WITH search_results AS (
                     SELECT
                         doc_id,
@@ -190,19 +201,14 @@ class MetadataDB:
                             'StartSel=<mark>, StopSel=</mark>, MaxWords=50, MinWords=20'
                         ) as headline
                     FROM papers
-                    WHERE to_tsvector('english', coalesce(title, '') || ' ' || coalesce(abstract, '')) @@ 
-                          to_tsquery('english', :query)
+                    WHERE {where_clause}
                 )
                 SELECT *
                 FROM search_results
                 WHERE score >= :cutoff
                 ORDER BY score DESC
                 LIMIT :limit
-            """), {
-                'query': or_query,  # Use OR between words
-                'cutoff': similarity_cutoff,
-                'limit': top_k
-            })
+            """), filter_params)
             # Debug the results
             results = []
             for row in search_results:
@@ -232,7 +238,6 @@ class MetadataDB:
 
     def save_paper(self, doc_id: str, pdf_path: str, metadata: Dict[str, Any]) -> bool:
         """Save paper PDF and metadata.
-        
         Args:
             doc_id: Document ID
             pdf_path: Path to PDF file

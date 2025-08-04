@@ -95,7 +95,7 @@ class ToyVectorDB(VectorDB):
             logger.error(error_msg)
             return False
         
-    def search(self, query: str, k: int = 5) -> List[Tuple[VectorEntry, float]]:
+    def search(self, query: str, k: int = 5, filters: Optional[Dict[str, Any]] = None) -> List[Tuple[VectorEntry, float]]:
         """Search using FAISS index."""
         try:
             if not self.entries:
@@ -127,6 +127,12 @@ class ToyVectorDB(VectorDB):
                 # Skip if we've already seen this document
                 if entry.doc_id in seen_doc_ids:
                     continue
+                
+                # Apply filters if provided
+                if filters and "doc_ids" in filters:
+                    allowed_doc_ids = set(filters["doc_ids"])
+                    if entry.doc_id not in allowed_doc_ids:
+                        continue
                     
                 results.append((entry, float(score)))
                 seen_doc_ids.add(entry.doc_id)
@@ -227,7 +233,8 @@ class ToyMetadataDB(MetadataDB):
         self,
         query: str,
         top_k: int = 10,
-        similarity_cutoff: float = 0.1
+        similarity_cutoff: float = 0.1,
+        filters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """Search papers using simple TF-IDF-like matching.
         
@@ -235,6 +242,7 @@ class ToyMetadataDB(MetadataDB):
             query: Search query string
             top_k: Maximum number of results to return
             similarity_cutoff: Minimum similarity score to include in results
+            filters: Optional filters to apply to search results
             
         Returns:
             List of paper metadata dictionaries with search scores
@@ -246,6 +254,12 @@ class ToyMetadataDB(MetadataDB):
             # Calculate scores for each document
             results = []
             for doc_id, metadata in self.metadata.items():
+                # Apply filters if provided
+                if filters and "doc_ids" in filters:
+                    allowed_doc_ids = set(filters["doc_ids"])
+                    if doc_id not in allowed_doc_ids:
+                        continue
+                
                 # Create document text from title and abstract
                 doc_text = f"{metadata['title']} {metadata['abstract']}"
                 doc_terms = set(doc_text.lower().split())
