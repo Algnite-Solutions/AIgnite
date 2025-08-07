@@ -94,10 +94,10 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
 
         search = arxiv.Search(
             query=query,
-            max_results=3,  # You can set max papers you want here
+            max_results=None,  # You can set max papers you want here
             sort_by=arxiv.SortCriterion.SubmittedDate
         )
-        print('only 3 papers')
+        #print('only 3 papers')
         print(f"grabbing arXiv papers in cs.* submitted from {self.start_time} to {self.end_time}......")
 
         # Test if we have extracted already or not. Download pdf and try to download html
@@ -112,7 +112,6 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
                 if arxiv_id in f.read():
                     print(f"{arxiv_id} is already extracted before!")
                     continue
-            print(1)
             try:
                 #add basic info
                 add_doc = DocSet(
@@ -126,7 +125,6 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
                 #Set htmlpath to None first and update it later
                 HTML_path=None 
             )
-                print(2)
 
                 success = download_paper(
                     result=result,
@@ -206,7 +204,7 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
                     numbers = re.findall(r'\d+', fig_id)
                     if len(numbers) == 2:
                         figure_name = str(arxivid)+'_'+"Figure" + numbers[1]
-                    elif len(fig_id) > 2:
+                    elif len(numbers) > 2:
                         figure_name = str(arxivid)+'_'+"Figure" + numbers[1] + f'({numbers[2]})'
                     else:
                         figure_name = str(arxivid)+'_'+"Figure"
@@ -272,11 +270,21 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
         self.init_docset()
 
         print("Init over. Now begin chunking...")
-        i = 0
+
+            # 读取已处理的论文列表
+        processed_papers = set()
+        try:
+            with open(self.arxiv_pool, "r", encoding="utf-8") as f:
+                processed_papers = set(line.strip() for line in f.readlines())
+        except FileNotFoundError:
+            pass
+
         for filename in os.listdir(self.html_text_folder):
-            print(i)
-            i = i + 1
             if filename.endswith(".html"):
+                # 检查是否已处理
+                arxiv_id = filename[:-5]
+                if arxiv_id in processed_papers:
+                    continue
                 file_path = os.path.join(self.html_text_folder, filename)
 
                 with open(file_path, 'r', encoding='utf-8') as file:
@@ -285,6 +293,7 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
 
                     for docset in self.docs:
                         if docset.doc_id == filename[:-5] and docset.HTML_path is not None:
+                            print(f"Processing {docset.doc_id}")
                             figurechunks = self.extract_figures_to_folder(soup,self.image_folder_path,docset.doc_id)
                             table_chunks = self.extract_tables(soup,docset.doc_id)
                             docset.figure_chunks = figurechunks
