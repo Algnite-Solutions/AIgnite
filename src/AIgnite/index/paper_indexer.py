@@ -120,6 +120,7 @@ class PaperIndexer(BaseIndexer):
                 
                 # Create metadata
                 metadata = {
+                    "doc_id": paper.doc_id,
                     "title": paper.title,
                     "abstract": paper.abstract,
                     "authors": paper.authors,
@@ -245,6 +246,9 @@ class PaperIndexer(BaseIndexer):
             for result in search_results:
                 if self.metadata_db is not None:
                     metadata = self.metadata_db.get_metadata(result.doc_id)
+            #        print('METADATA')
+            #        print(metadata)
+            #        print('--------------------------------')
                     if metadata:
                         paper_info = metadata.copy()
                         paper_info["similarity_score"] = result.score
@@ -317,6 +321,7 @@ class PaperIndexer(BaseIndexer):
             metadata = None
             if self.metadata_db is not None:
                 metadata = self.metadata_db.get_metadata(doc_id)
+
             
             # Delete from vector database if available
             if self.vector_db is not None:

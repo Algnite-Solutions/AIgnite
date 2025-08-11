@@ -216,13 +216,15 @@ class VectorDB:
     def search(
         self,
         query: str,
-        k: int = 5
+        k: int = 5,
+        filters: Optional[Dict[str, Any]] = None
     ) -> List[Tuple[VectorEntry, float]]:
         """Search for similar vectors.
         
         Args:
             query: Search query text
-            k: Number of results to return
+            top_k: Number of results to return
+            filters: Optional filters to apply to search results
             
         Returns:
             List of tuples containing (VectorEntry, similarity_score)
@@ -254,6 +256,12 @@ class VectorDB:
                 # Skip if we've already seen this document
                 if entry.doc_id in seen_doc_ids:
                     continue
+                
+                # Apply filters if provided
+                if filters and "doc_ids" in filters:
+                    allowed_doc_ids = set(filters["doc_ids"])
+                    if entry.doc_id not in allowed_doc_ids:
+                        continue
                     
                 results.append((entry, float(score)))
                 seen_doc_ids.add(entry.doc_id)

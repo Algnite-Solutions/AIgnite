@@ -64,7 +64,8 @@ class VectorSearchStrategy(SearchStrategy):
     ) -> List[SearchResult]:
         try:
             # Use vector_db's search implementation which uses FAISS
-            vector_results = self.vector_db.search(query, k=top_k)
+
+            vector_results = self.vector_db.search(query, k=top_k, filters=filters)
             
             # Process results
             results = []
@@ -112,7 +113,8 @@ class TFIDFSearchStrategy(SearchStrategy):
             search_results = self.metadata_db.search_papers(
                 query=query,
                 top_k=top_k,
-                similarity_cutoff=similarity_cutoff
+                similarity_cutoff=similarity_cutoff,
+                filters=filters
             )
             #print('IN TFIDFSearchStrategy')
             #print(search_results)
