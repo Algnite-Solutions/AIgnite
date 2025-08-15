@@ -258,10 +258,27 @@ class VectorDB:
                     continue
                 
                 # Apply filters if provided
-                if filters and "doc_ids" in filters:
-                    allowed_doc_ids = set(filters["doc_ids"])
-                    if entry.doc_id not in allowed_doc_ids:
-                        continue
+                if filters:
+                    if "include" in filters or "exclude" in filters:
+                        # New filter structure - apply memory filtering
+                        from ..index.filter_parser import FilterParser
+                        filter_parser = FilterParser()
+                        
+                        # Get metadata for filtering (if available)
+                        def get_field_value(item, field):
+                            if field == "doc_ids":
+                                return item.doc_id
+                            # For other fields, we'd need metadata - for now, skip complex filtering
+                            return None
+                        
+                        # Apply filters to this entry
+                        if not filter_parser.apply_memory_filters([entry], filters, get_field_value):
+                            continue
+                    elif "doc_ids" in filters:
+                        # Backward compatibility
+                        allowed_doc_ids = set(filters["doc_ids"])
+                        if entry.doc_id not in allowed_doc_ids:
+                            continue
                     
                 results.append((entry, float(score)))
                 seen_doc_ids.add(entry.doc_id)

@@ -172,11 +172,27 @@ class MetadataDB:
             where_clause = "to_tsvector('english', coalesce(title, '') || ' ' || coalesce(abstract, '')) @@ to_tsquery('english', :query)"
             filter_params = {'query': or_query, 'cutoff': similarity_cutoff, 'limit': top_k}
             
-            if filters and "doc_ids" in filters:
-                doc_ids = filters["doc_ids"]
-                if doc_ids:
-                    placeholders = ','.join([f"'{doc_id}'" for doc_id in doc_ids])
-                    where_clause += f" AND doc_id IN ({placeholders})"
+            # Handle new filter structure
+            if filters:
+                if "include" in filters or "exclude" in filters:
+                    # New filter structure
+                    from ..index.filter_parser import FilterParser
+                    filter_parser = FilterParser()
+                    filter_where, filter_params_update = filter_parser.get_sql_conditions(filters)
+                    
+                    if filter_where != "1=1":
+                        where_clause += f" AND ({filter_where})"
+                    
+                    # Update parameters
+                    for key, value in filter_params_update.items():
+                        filter_params[f"filter_{key}"] = value
+                        
+                elif "doc_ids" in filters:
+                    # Backward compatibility
+                    doc_ids = filters["doc_ids"]
+                    if doc_ids:
+                        placeholders = ','.join([f"'{doc_id}'" for doc_id in doc_ids])
+                        where_clause += f" AND doc_id IN ({placeholders})"
 
             # Modified search query with to_tsquery for OR logic
             search_results = session.execute(text(f"""
