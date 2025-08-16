@@ -36,6 +36,7 @@ class TableSchema(Base):
     pdf_path = Column(String)
     HTML_path = Column(String, nullable=True)
     blog = Column(Text, nullable=True)  # New field for long text blog
+    comments = Column(Text, nullable=True)  # Store comments field
     
     # Add tsvector column for full-text search
     __table_args__ = (
@@ -71,7 +72,8 @@ class TableSchema(Base):
             extra_metadata=docset.metadata,
             pdf_path=docset.pdf_path,
             HTML_path=docset.HTML_path,
-            blog=getattr(docset, 'blog', None)  # Support blog field if present
+            blog=getattr(docset, 'blog', None),  # Support blog field if present
+            comments=docset.comments  # Store comments field
         )
     
     def to_dict(self) -> Dict[str, Any]:
@@ -92,6 +94,7 @@ class TableSchema(Base):
             'table_ids': self.table_ids,
             'metadata': self.extra_metadata,
             'blog': self.blog,  # Include blog field in output
+            'comments': self.comments,  # Include comments field in output
             'pdf_path': self.pdf_path,  # Add pdf_path
             'HTML_path': self.HTML_path  # Add HTML_path
         }
@@ -172,12 +175,20 @@ class MetadataDB:
             where_clause = "to_tsvector('english', coalesce(title, '') || ' ' || coalesce(abstract, '')) @@ to_tsquery('english', :query)"
             filter_params = {'query': or_query, 'cutoff': similarity_cutoff, 'limit': top_k}
             
-            if filters and "doc_ids" in filters:
-                doc_ids = filters["doc_ids"]
-                if doc_ids:
-                    placeholders = ','.join([f"'{doc_id}'" for doc_id in doc_ids])
-                    where_clause += f" AND doc_id IN ({placeholders})"
-
+            # Handle new filter structure
+            if filters:
+                if "include" in filters or "exclude" in filters:
+                    # New filter structure
+                    from ..index.filter_parser import FilterParser
+                    filter_parser = FilterParser()
+                    filter_where, filter_params_update = filter_parser.get_sql_conditions(filters)
+                    
+                    if filter_where != "1=1":
+                        where_clause += f" AND ({filter_where})"
+                    
+                    # Update parameters
+                    for key, value in filter_params_update.items():
+                        filter_params[f"filter_{key}"] = value
             # Modified search query with to_tsquery for OR logic
             search_results = session.execute(text(f"""
                 WITH search_results AS (
@@ -281,7 +292,8 @@ class MetadataDB:
                 extra_metadata=metadata.get('metadata', {}),
                 pdf_path=pdf_path,
                 HTML_path=metadata.get('HTML_path'),
-                blog=getattr(metadata, 'blog', None)  # Support blog field if present
+                blog=getattr(metadata, 'blog', None),  # Support blog field if present
+                comments=metadata.get('comments')  # Store comments field
             )
             session.add(paper)
             session.commit()

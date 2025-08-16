@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from AIgnite.db.vector_db import VectorDB, VectorEntry
 from AIgnite.db.metadata_db import MetadataDB
 from AIgnite.db.image_db import MinioImageDB
+from AIgnite.index.filter_parser import FilterParser
 import logging
 import sys
 import traceback
@@ -75,7 +76,7 @@ class ToyVectorDB(VectorDB):
             self.index.add(abstract_entry.vector)
             
             # Add text chunk vectors
-            chunk_ids = metadata.get('text_chunk_ids', [])
+            chunk_ids = metadata.get('chunk_ids', [])  # Use 'chunk_ids' instead of 'text_chunk_ids'
             for chunk_text, chunk_id in zip(text_chunks, chunk_ids):
                 chunk_entry = VectorEntry(
                     doc_id=doc_id,
@@ -129,10 +130,26 @@ class ToyVectorDB(VectorDB):
                     continue
                 
                 # Apply filters if provided
-                if filters and "doc_ids" in filters:
-                    allowed_doc_ids = set(filters["doc_ids"])
-                    if entry.doc_id not in allowed_doc_ids:
-                        continue
+                if filters:
+                    if "include" in filters or "exclude" in filters:
+                        # New filter structure - apply memory filtering
+                        filter_parser = FilterParser()
+                        
+                        # Get metadata for filtering (if available)
+                        def get_field_value(item, field):
+                            if field == "doc_ids":
+                                return item.doc_id
+                            # For other fields, we'd need metadata - for now, skip complex filtering
+                            return None
+                        
+                        # Apply filters to this entry
+                        if not filter_parser.apply_memory_filters([entry], filters, get_field_value):
+                            continue
+                    elif "doc_ids" in filters:
+                        # Backward compatibility
+                        allowed_doc_ids = set(filters["doc_ids"])
+                        if entry.doc_id not in allowed_doc_ids:
+                            continue
                     
                 results.append((entry, float(score)))
                 seen_doc_ids.add(entry.doc_id)
@@ -208,7 +225,13 @@ class ToyMetadataDB(MetadataDB):
         
     def get_metadata(self, doc_id: str) -> Optional[Dict[str, Any]]:
         """Retrieve metadata for a document."""
-        return self.metadata.get(doc_id)
+        metadata = self.metadata.get(doc_id)
+        if metadata:
+            # Ensure doc_id is included in the returned metadata
+            metadata_with_doc_id = metadata.copy()
+            metadata_with_doc_id['doc_id'] = doc_id
+            return metadata_with_doc_id
+        return None
         
     def get_pdf(self, doc_id: str, save_path: Optional[str] = None) -> Optional[bytes]:
         """Retrieve PDF content for a document."""
@@ -255,10 +278,30 @@ class ToyMetadataDB(MetadataDB):
             results = []
             for doc_id, metadata in self.metadata.items():
                 # Apply filters if provided
-                if filters and "doc_ids" in filters:
-                    allowed_doc_ids = set(filters["doc_ids"])
-                    if doc_id not in allowed_doc_ids:
-                        continue
+                if filters:
+                    if "include" in filters or "exclude" in filters:
+                        # New filter structure - apply memory filtering
+                        
+                        filter_parser = FilterParser()
+                        
+                        # Create a mock item for filtering
+                        mock_item = {
+                            'doc_id': doc_id,
+                            'categories': metadata.get('categories', []),
+                            'authors': metadata.get('authors', []),
+                            'published_date': metadata.get('published_date', ''),
+                            'title': metadata.get('title', ''),
+                            'abstract': metadata.get('abstract', '')
+                        }
+                        
+                        # Apply filters to this item
+                        if not filter_parser.apply_memory_filters([mock_item], filters, lambda item, field: item.get(field)):
+                            continue
+                    elif "doc_ids" in filters:
+                        # Backward compatibility
+                        allowed_doc_ids = set(filters["doc_ids"])
+                        if doc_id not in allowed_doc_ids:
+                            continue
                 
                 # Create document text from title and abstract
                 doc_text = f"{metadata['title']} {metadata['abstract']}"

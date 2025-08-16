@@ -49,6 +49,8 @@ class DocSet(BaseModel):
     metadata: dict = Field(default_factory=dict)
     pdf_path: str
     HTML_path: str | None
+    comments: str | None
+
 
 class DocSetList(BaseModel):
     docsets: List[DocSet]

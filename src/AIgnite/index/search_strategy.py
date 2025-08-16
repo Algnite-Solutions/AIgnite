@@ -64,7 +64,6 @@ class VectorSearchStrategy(SearchStrategy):
     ) -> List[SearchResult]:
         try:
             # Use vector_db's search implementation which uses FAISS
-
             vector_results = self.vector_db.search(query, k=top_k, filters=filters)
             
             # Process results
