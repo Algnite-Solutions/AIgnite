@@ -128,7 +128,8 @@ class PaperIndexer(BaseIndexer):
                     "categories": paper.categories,
                     "published_date": paper.published_date,
                     "chunk_ids": [chunk.id for chunk in paper.text_chunks],
-                    "figure_ids": [chunk.id for chunk in paper.figure_chunks]
+                    "figure_ids": [chunk.id for chunk in paper.figure_chunks],
+                    "comments": paper.comments  # Store comments field
                 }
                 
                 # Store metadata if database is available

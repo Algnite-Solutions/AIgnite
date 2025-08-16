@@ -274,12 +274,7 @@ class VectorDB:
                         # Apply filters to this entry
                         if not filter_parser.apply_memory_filters([entry], filters, get_field_value):
                             continue
-                    elif "doc_ids" in filters:
-                        # Backward compatibility
-                        allowed_doc_ids = set(filters["doc_ids"])
-                        if entry.doc_id not in allowed_doc_ids:
-                            continue
-                    
+                        
                 results.append((entry, float(score)))
                 seen_doc_ids.add(entry.doc_id)
                 

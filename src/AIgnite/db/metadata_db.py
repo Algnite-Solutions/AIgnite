@@ -36,6 +36,7 @@ class TableSchema(Base):
     pdf_path = Column(String)
     HTML_path = Column(String, nullable=True)
     blog = Column(Text, nullable=True)  # New field for long text blog
+    comments = Column(Text, nullable=True)  # Store comments field
     
     # Add tsvector column for full-text search
     __table_args__ = (
@@ -71,7 +72,8 @@ class TableSchema(Base):
             extra_metadata=docset.metadata,
             pdf_path=docset.pdf_path,
             HTML_path=docset.HTML_path,
-            blog=getattr(docset, 'blog', None)  # Support blog field if present
+            blog=getattr(docset, 'blog', None),  # Support blog field if present
+            comments=docset.comments  # Store comments field
         )
     
     def to_dict(self) -> Dict[str, Any]:
@@ -92,6 +94,7 @@ class TableSchema(Base):
             'table_ids': self.table_ids,
             'metadata': self.extra_metadata,
             'blog': self.blog,  # Include blog field in output
+            'comments': self.comments,  # Include comments field in output
             'pdf_path': self.pdf_path,  # Add pdf_path
             'HTML_path': self.HTML_path  # Add HTML_path
         }
@@ -186,14 +189,6 @@ class MetadataDB:
                     # Update parameters
                     for key, value in filter_params_update.items():
                         filter_params[f"filter_{key}"] = value
-                        
-                elif "doc_ids" in filters:
-                    # Backward compatibility
-                    doc_ids = filters["doc_ids"]
-                    if doc_ids:
-                        placeholders = ','.join([f"'{doc_id}'" for doc_id in doc_ids])
-                        where_clause += f" AND doc_id IN ({placeholders})"
-
             # Modified search query with to_tsquery for OR logic
             search_results = session.execute(text(f"""
                 WITH search_results AS (
@@ -297,7 +292,8 @@ class MetadataDB:
                 extra_metadata=metadata.get('metadata', {}),
                 pdf_path=pdf_path,
                 HTML_path=metadata.get('HTML_path'),
-                blog=getattr(metadata, 'blog', None)  # Support blog field if present
+                blog=getattr(metadata, 'blog', None),  # Support blog field if present
+                comments=metadata.get('comments')  # Store comments field
             )
             session.add(paper)
             session.commit()

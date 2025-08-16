@@ -35,11 +35,6 @@ class FilterParser:
         if not filters:
             return parsed_filters
             
-        # Handle backward compatibility for simple doc_ids filter
-        if "doc_ids" in filters and not isinstance(filters, dict):
-            parsed_filters["include"]["doc_ids"] = filters["doc_ids"]
-            return parsed_filters
-            
         # Validate filter structure
         if not isinstance(filters, dict):
             raise ValueError("Filters must be a dictionary")
@@ -62,10 +57,6 @@ class FilterParser:
             if not isinstance(exclude_filters, dict):
                 raise ValueError("Exclude filters must be a dictionary")
             parsed_filters["exclude"] = self._validate_field_filters(exclude_filters, "exclude")
-            
-        # Handle backward compatibility for simple doc_ids
-        if "doc_ids" in filters and "include" not in filters:
-            parsed_filters["include"]["doc_ids"] = filters["doc_ids"]
             
         return parsed_filters
     
