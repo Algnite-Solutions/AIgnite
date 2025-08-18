@@ -5,6 +5,7 @@ from ..db.vector_db import VectorDB
 from ..db.metadata_db import MetadataDB
 from ..db.image_db import MinioImageDB
 from .search_strategy import SearchStrategy, VectorSearchStrategy, TFIDFSearchStrategy, HybridSearchStrategy, SearchResult
+from .filter_parser import FilterParser
 import logging
 from tqdm import tqdm
 import os
@@ -33,6 +34,7 @@ class PaperIndexer(BaseIndexer):
         self.metadata_db = metadata_db
         self.image_db = image_db
         self.search_strategy = None
+        self.filter_parser = FilterParser()
 
     def __del__(self):
         """Cleanup method."""
@@ -120,14 +122,14 @@ class PaperIndexer(BaseIndexer):
                 
                 # Create metadata
                 metadata = {
-                    "doc_id": paper.doc_id,
                     "title": paper.title,
                     "abstract": paper.abstract,
                     "authors": paper.authors,
                     "categories": paper.categories,
                     "published_date": paper.published_date,
                     "chunk_ids": [chunk.id for chunk in paper.text_chunks],
-                    "figure_ids": [chunk.id for chunk in paper.figure_chunks]
+                    "figure_ids": [chunk.id for chunk in paper.figure_chunks],
+                    "comments": paper.comments  # Store comments field
                 }
                 
                 # Store metadata if database is available
@@ -232,11 +234,14 @@ class PaperIndexer(BaseIndexer):
             if strategy_type:
                 self.set_search_strategy(strategy_type)
             
+            # Parse and validate filters
+            parsed_filters = self.filter_parser.parse_filters(filters)
+            
             # Perform search
             search_results = self.search_strategy.search(
                 query=query,
                 top_k=top_k,
-                filters=filters,
+                filters=parsed_filters,
                 similarity_cutoff=similarity_cutoff
             )
             #print(111)
@@ -246,9 +251,6 @@ class PaperIndexer(BaseIndexer):
             for result in search_results:
                 if self.metadata_db is not None:
                     metadata = self.metadata_db.get_metadata(result.doc_id)
-            #        print('METADATA')
-            #        print(metadata)
-            #        print('--------------------------------')
                     if metadata:
                         paper_info = metadata.copy()
                         paper_info["similarity_score"] = result.score
@@ -321,7 +323,6 @@ class PaperIndexer(BaseIndexer):
             metadata = None
             if self.metadata_db is not None:
                 metadata = self.metadata_db.get_metadata(doc_id)
-
             
             # Delete from vector database if available
             if self.vector_db is not None:

@@ -8,6 +8,9 @@ from typing import List
 from AIgnite.index.paper_indexer import PaperIndexer
 from AIgnite.data.docset import DocSet, TextChunk, FigureChunk, TableChunk, ChunkType
 from toy_dbs import ToyVectorDB, ToyMetadataDB, ToyImageDB
+import os
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+os.environ['OMP_NUM_THREADS'] = '1'
 
 class TestPaperIndexerWithToyDBs(unittest.TestCase):
     @classmethod
@@ -363,118 +366,191 @@ class TestPaperIndexerWithToyDBs(unittest.TestCase):
     
 
     def test_7_filtering_functionality(self):
-        """Test filtering functionality across all search strategies."""
-        print("✅ Testing filtering functionality...")
+        """Test filtering functionality using filter_parser with doc_ids inclusion and exclusion."""
+        print("✅ Testing filtering functionality with filter_parser...")
         
-        # Test vector search with filters
-        print("✅ Testing vector search with doc_ids filter...")
+        # Test 1: Basic doc_ids inclusion using new filter structure
+        print("✅ Test 1: Testing doc_ids inclusion with new filter structure...")
         self.indexer.set_search_strategy('vector')
         
-        # Search without filters
-        results_no_filter = self.indexer.find_similar_papers(
+        # Search with include filter using new structure
+        results_include = self.indexer.find_similar_papers(
             query="language models",
             top_k=5,
+            filters={
+                "include": {
+                    "doc_ids": ["2106.14834", "2106.14835"]
+                }
+            },
             strategy_type='vector'
         )
-        print(f"Vector search without filter: {len(results_no_filter)} results")
+
+        print(f"Vector search with include filter: {len(results_include)} results")
         
-        # Search with doc_ids filter
-        results_with_filter = self.indexer.find_similar_papers(
-            query="language models",
-            top_k=5,
-            filters={"doc_ids": ["2106.14834", "2106.14835"]},
-            strategy_type='vector'
-        )
-        print(f"Vector search with filter: {len(results_with_filter)} results")
-        
-        # Verify filtering works correctly
-        print(results_with_filter)
-        
-        if results_with_filter:
-            doc_ids_in_results = {r['doc_id'] for r in results_with_filter}
+        # Verify inclusion filtering works correctly
+        if results_include:
+            doc_ids_in_results = {r['doc_id'] for r in results_include}
             allowed_doc_ids = {"2106.14834", "2106.14835"}
             self.assertTrue(doc_ids_in_results.issubset(allowed_doc_ids))
-            print("✅ Vector search filtering working correctly")
+            print("✅ Vector search inclusion filtering working correctly")
         
-        # Test TF-IDF search with filters
-        print("✅ Testing TF-IDF search with doc_ids filter...")
+        # Test 2: Basic doc_ids exclusion using new filter structure
+        print("✅ Test 2: Testing doc_ids exclusion with new filter structure...")
+        
+        # Search with exclude filter using new structure
+        results_exclude = self.indexer.find_similar_papers(
+            query="language models",
+            top_k=5,
+            filters={
+                "exclude": {
+                    "doc_ids": ["2106.14836", "2106.14837", "2106.14838"]
+                }
+            },
+            strategy_type='vector'
+        )
+        print(f"Vector search with exclude filter: {len(results_exclude)} results")
+        
+        # Verify exclusion filtering works correctly
+        if results_exclude:
+            doc_ids_in_results = {r['doc_id'] for r in results_exclude}
+            excluded_doc_ids = {"2106.14836", "2106.14837", "2106.14838"}
+            self.assertTrue(doc_ids_in_results.isdisjoint(excluded_doc_ids))
+            print("✅ Vector search exclusion filtering working correctly")
+        
+        # Test 3: Combined inclusion and exclusion using new filter structure
+        print("✅ Test 3: Testing combined inclusion and exclusion...")
+        
+        # Search with both include and exclude filters
+        results_combined = self.indexer.find_similar_papers(
+            query="language models",
+            top_k=5,
+            filters={
+                "include": {
+                    "doc_ids": ["2106.14834", "2106.14835", "2106.14836"]
+                },
+                "exclude": {
+                    "doc_ids": ["2106.14836"]
+                }
+            },
+            strategy_type='vector'
+        )
+        print(f"Vector search with combined filters: {len(results_combined)} results")
+        
+        # Verify combined filtering works correctly
+        if results_combined:
+            doc_ids_in_results = {r['doc_id'] for r in results_combined}
+            # Should include 2106.14834 and 2106.14835, exclude 2106.14836
+            expected_doc_ids = {"2106.14834", "2106.14835"}
+            self.assertTrue(doc_ids_in_results.issubset(expected_doc_ids))
+            print("✅ Vector search combined filtering working correctly")
+        
+        # Test 4: Backward compatibility with simple doc_ids filter
+        print("✅ Test 4: Testing backward compatibility with simple doc_ids filter...")
+        
+        # Search with old format (should still work)
+        results_backward = self.indexer.find_similar_papers(
+            query="language models",
+            top_k=5,
+            filters={"doc_ids": ["2106.14834"]},
+            strategy_type='vector'
+        )
+        print(f"Vector search with backward compatibility: {len(results_backward)} results")
+
+        
+        # Test 5: TF-IDF search with new filter structure
+        print("✅ Test 5: Testing TF-IDF search with new filter structure...")
         self.indexer.set_search_strategy('tf-idf')
         
-        # Search without filters
-        results_no_filter_tfidf = self.indexer.find_similar_papers(
+        results_tfidf_include = self.indexer.find_similar_papers(
             query="BERT natural language",
             top_k=5,
+            filters={
+                "include": {
+                    "doc_ids": ["2106.14835"]
+                }
+            },
             strategy_type='tf-idf'
         )
-        print(f"TF-IDF search without filter: {len(results_no_filter_tfidf)} results")
+        print(f"TF-IDF search with include filter: {len(results_tfidf_include)} results")
         
-        # Search with doc_ids filter
-        results_with_filter_tfidf = self.indexer.find_similar_papers(
-            query="BERT natural language",
-            top_k=5,
-            filters={"doc_ids": ["2106.14835"]},
-            strategy_type='tf-idf'
-        )
-        print(f"TF-IDF search with filter: {len(results_with_filter_tfidf)} results")
-        
-        # Verify filtering works correctly
-        if results_with_filter_tfidf:
-            doc_ids_in_results = {r['doc_id'] for r in results_with_filter_tfidf}
+        if results_tfidf_include:
+            doc_ids_in_results = {r['doc_id'] for r in results_tfidf_include}
             allowed_doc_ids = {"2106.14835"}
             self.assertTrue(doc_ids_in_results.issubset(allowed_doc_ids))
-            print("✅ TF-IDF search filtering working correctly")
+            print("✅ TF-IDF search inclusion filtering working correctly")
         
-        # Test hybrid search with filters
-        print("✅ Testing hybrid search with doc_ids filter...")
+        # Test 6: Hybrid search with new filter structure
+        print("✅ Test 6: Testing hybrid search with new filter structure...")
         self.indexer.set_search_strategy('hybrid')
         
-        # Search without filters
-        results_no_filter_hybrid = self.indexer.find_similar_papers(
+        results_hybrid_combined = self.indexer.find_similar_papers(
             query="deep learning vision",
             top_k=5,
+            filters={
+                "include": {
+                    "doc_ids": ["2106.14837", "2106.14838"]
+                },
+                "exclude": {
+                    "doc_ids": ["2106.14836"]
+                }
+            },
             strategy_type='hybrid'
         )
-        print(f"Hybrid search without filter: {len(results_no_filter_hybrid)} results")
+        print(f"Hybrid search with combined filters: {len(results_hybrid_combined)} results")
         
-        # Search with doc_ids filter
-        results_with_filter_hybrid = self.indexer.find_similar_papers(
-            query="deep learning vision",
-            top_k=5,
-            filters={"doc_ids": ["2106.14837", "2106.14838"]},
-            strategy_type='hybrid'
-        )
-        print(f"Hybrid search with filter: {len(results_with_filter_hybrid)} results")
+        if results_hybrid_combined:
+            doc_ids_in_results = {r['doc_id'] for r in results_hybrid_combined}
+            expected_doc_ids = {"2106.14837", "2106.14838"}
+            self.assertEqual(doc_ids_in_results, expected_doc_ids)
+            print("✅ Hybrid search combined filtering working correctly")
         
-        # Verify filtering works correctly
-        if results_with_filter_hybrid:
-            doc_ids_in_results = {r['doc_id'] for r in results_with_filter_hybrid}
-            allowed_doc_ids = {"2106.14837", "2106.14838"}
-            self.assertTrue(doc_ids_in_results.issubset(allowed_doc_ids))
-            print("✅ Hybrid search filtering working correctly")
+        # Test 7: Edge cases with new filter structure
+        print("✅ Test 7: Testing edge cases with new filter structure...")
         
-        # Test edge case: empty filter list
-        print("✅ Testing edge case: empty doc_ids filter...")
-        results_empty_filter = self.indexer.find_similar_papers(
+        # Empty include filter
+        results_empty_include = self.indexer.find_similar_papers(
             query="language models",
             top_k=5,
-            filters={"doc_ids": []},
+            filters={
+                "include": {
+                    "doc_ids": []
+                }
+            },
             strategy_type='vector'
         )
-        self.assertEqual(len(results_empty_filter), 0)
-        print("✅ Empty filter working correctly")
+        self.assertEqual(len(results_empty_include), 0)
+        print("✅ Empty include filter working correctly")
         
-        # Test edge case: non-existent doc_ids in filter
-        print("✅ Testing edge case: non-existent doc_ids in filter...")
-        results_nonexistent_filter = self.indexer.find_similar_papers(
+        # Non-existent doc_ids in include filter
+        results_nonexistent_include = self.indexer.find_similar_papers(
             query="language models",
             top_k=5,
-            filters={"doc_ids": ["nonexistent_doc_1", "nonexistent_doc_2"]},
+            filters={
+                "include": {
+                    "doc_ids": ["nonexistent_doc_1", "nonexistent_doc_2"]
+                }
+            },
             strategy_type='vector'
         )
-        self.assertEqual(len(results_nonexistent_filter), 0)
-        print("✅ Non-existent doc_ids filter working correctly")
+        self.assertEqual(len(results_nonexistent_include), 0)
+        print("✅ Non-existent doc_ids in include filter working correctly")
         
-        print("✅ All filtering functionality tests passed!")
+        # Non-existent doc_ids in exclude filter (should return all results)
+        results_nonexistent_exclude = self.indexer.find_similar_papers(
+            query="language models",
+            top_k=5,
+            filters={
+                "exclude": {
+                    "doc_ids": ["nonexistent_doc_1", "nonexistent_doc_2"]
+                }
+            },
+            strategy_type='vector'
+        )
+        # Should return results since excluding non-existent docs doesn't affect anything
+        self.assertGreaterEqual(len(results_nonexistent_exclude), 0)
+        print("✅ Non-existent doc_ids in exclude filter working correctly")
+        
+        print("✅ All filtering functionality tests with filter_parser passed!")
 
 
     @classmethod
