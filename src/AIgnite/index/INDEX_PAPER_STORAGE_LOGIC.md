@@ -11,11 +11,21 @@ PaperIndexer.index_papers()
 ├── 数据准备阶段
 │   └── 构建metadata对象
 ├── 并行存储阶段
-│   ├── MetadataDB (PostgreSQL) - 元数据存储
+│   ├── MetadataDB (PostgreSQL) - 元数据存储 + 全文内容存储
 │   ├── VectorDB (FAISS) - 向量存储
 │   └── MinioImageDB (MinIO) - 图像存储
 └── 状态跟踪
     └── 返回索引状态报告
+
+数据检索架构（新方案）
+├── 过滤器阶段
+│   ├── MetadataDB: SQL过滤 → 候选文档ID列表
+│   └── VectorDB: 内存过滤 → 候选向量条目列表
+├── 搜索阶段
+│   ├── MetadataDB: 在候选文档中进行全文搜索
+│   └── VectorDB: 在候选条目中进行向量搜索
+└── 结果合并
+    └── 元数据增强 + 相似度排序
 ```
 
 ## 详细存储流程
@@ -63,18 +73,20 @@ metadata = {
 **存储条件**
 ```python
 if self.metadata_db is not None and hasattr(paper, 'pdf_path'):
-    success = self.metadata_db.save_paper(paper.doc_id, paper.pdf_path, metadata)
+    success = self.metadata_db.save_paper(paper.doc_id, paper.pdf_path, metadata, paper.text_chunks)
 ```
 
 **存储内容**
 - **结构化数据**：标题、摘要、作者、分类、发布日期
 - **PDF二进制数据**：完整的PDF文件内容
+- **文本块内容**：完整的文本块内容，使用doc_id+chunk_id作为唯一标识，chunk_order代表在文档中的顺序（新增）
 - **引用关系**：文本块ID、图像块ID、表格块ID
 - **文件路径**：PDF路径、HTML路径
 - **扩展元数据**：其他自定义字段
 
 **数据库表结构**
 ```sql
+-- 论文元数据表
 CREATE TABLE papers (
     id SERIAL PRIMARY KEY,
     doc_id VARCHAR UNIQUE NOT NULL,      -- 论文唯一标识符
@@ -94,14 +106,37 @@ CREATE TABLE papers (
     comments TEXT                       -- 论文评论/备注
 );
 
+-- 文本块内容表（新增）
+CREATE TABLE text_chunks (
+    id VARCHAR PRIMARY KEY,                -- 使用 doc_id + chunk_id 作为主键，保证全局唯一
+    doc_id VARCHAR NOT NULL,               -- 关联的论文ID
+    chunk_id VARCHAR NOT NULL,             -- 文档内的chunk顺序标识
+    text_content TEXT NOT NULL,            -- 文本块内容
+    chunk_order INTEGER,                   -- 在文档中的顺序号，便于排序
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- 外键约束
+    FOREIGN KEY (doc_id) REFERENCES papers(doc_id) ON DELETE CASCADE,
+    
+    -- 索引优化
+    INDEX idx_doc_id (doc_id),             -- 按文档查询
+    INDEX idx_chunk_order (doc_id, chunk_order), -- 按顺序查询
+    INDEX idx_text_content (text_content), -- 全文搜索优化
+    UNIQUE INDEX idx_doc_chunk (doc_id, chunk_id) -- 同一文档内chunk_id唯一
+);
+
 -- 全文搜索索引
 CREATE INDEX idx_fts ON papers 
 USING gin(to_tsvector('english', coalesce(title, '') || ' ' || coalesce(abstract, '')));
+
+-- 文本块内容全文搜索索引
+CREATE INDEX idx_chunk_text_fts ON text_chunks 
+USING gin(to_tsvector('english', text_content));
 ```
 
 **存储流程**
 ```python
-def save_paper(self, doc_id: str, pdf_path: str, metadata: Dict[str, Any]) -> bool:
+def save_paper(self, doc_id: str, pdf_path: str, metadata: Dict[str, Any], text_chunks: Optional[List] = None) -> bool:
     # 1. 验证必需字段
     required_fields = ['title', 'abstract', 'authors', 'categories', 'published_date']
     
@@ -134,8 +169,56 @@ def save_paper(self, doc_id: str, pdf_path: str, metadata: Dict[str, Any]) -> bo
     
     # 5. 保存到数据库
     session.add(paper)
+    
+    # 6. 保存文本块内容（如果提供）
+    if text_chunks:
+        chunk_success = self.save_text_chunks(doc_id, text_chunks)
+        if not chunk_success:
+            session.rollback()
+            return False
+    
     session.commit()
     return True
+
+def save_text_chunks(self, doc_id: str, text_chunks: List[TextChunk]) -> bool:
+    """保存文本块内容到数据库，使用 doc_id + chunk_id 作为唯一标识"""
+    try:
+        for chunk in text_chunks:
+            # 创建唯一ID：doc_id + chunk_id
+            unique_chunk_id = f"{doc_id}_{chunk.id}"
+            
+            chunk_record = TextChunkRecord(
+                id=unique_chunk_id,        # 主键：doc_id + chunk_id
+                doc_id=doc_id,             # 文档ID
+                chunk_id=chunk.id,         # 原始chunk_id
+                text_content=chunk.text,   # 文本内容
+                chunk_order=self._extract_order(chunk.id)  # 提取顺序号
+            )
+            self.session.add(chunk_record)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to save text chunks for {doc_id}: {str(e)}")
+        return False
+
+def _extract_order(self, chunk_id: str) -> int:
+    """从chunk_id中提取顺序号，便于排序"""
+    # 假设chunk_id格式为 "chunk_001", "chunk_002" 等
+    import re
+    match = re.search(r'(\d+)$', chunk_id)
+    return int(match.group(1)) if match else 0
+
+def get_text_chunks(self, doc_id: str) -> List[TextChunk]:
+    """按chunk_order顺序获取文档的所有文本块"""
+    chunks = self.session.query(TextChunkRecord)\
+        .filter_by(doc_id=doc_id)\
+        .order_by(TextChunkRecord.chunk_order)\
+        .all()
+    return [TextChunk(id=c.chunk_id, text=c.text_content) for c in chunks]
+
+def get_full_text(self, doc_id: str) -> str:
+    """获取文档的完整文本内容"""
+    chunks = self.get_text_chunks(doc_id)
+    return '\n\n'.join([chunk.text for chunk in chunks])
 ```
 
 #### 🧠 VectorDB (FAISS) - 向量存储
@@ -297,6 +380,7 @@ def save_image(self, doc_id: str, image_id: str, image_path: str = None, image_d
 
 #### 主键关联
 - **doc_id**：所有三个数据库的主关联键
+- **doc_id + chunk_id**：文本块在全文存储表中的唯一标识
 - **chunk_id**：文本块在向量数据库中的唯一标识
 - **image_id**：图像在MinIO中的唯一标识
 
@@ -311,7 +395,7 @@ metadata = {
 ```
 
 #### 数据完整性
-- **MetadataDB**：存储完整的论文信息和引用关系
+- **MetadataDB**：存储完整的论文信息、引用关系和文本块内容
 - **VectorDB**：存储可搜索的向量表示
 - **MinioImageDB**：存储视觉内容
 
@@ -339,15 +423,16 @@ metadata = {
 ```python
 # 每个论文的索引状态
 paper_status = {
-    "metadata": False,  # 元数据存储状态
-    "vectors": False,   # 向量存储状态
-    "images": False     # 图像存储状态
+    "metadata": False,      # 元数据存储状态
+    "text_chunks": False,   # 文本块存储状态（新增）
+    "vectors": False,       # 向量存储状态
+    "images": False         # 图像存储状态
 }
 
 # 返回所有论文的索引状态
 indexing_status = {
-    "paper_001": {"metadata": True, "vectors": True, "images": False},
-    "paper_002": {"metadata": True, "vectors": False, "images": True}
+    "paper_001": {"metadata": True, "text_chunks": True, "vectors": True, "images": False},
+    "paper_002": {"metadata": True, "text_chunks": True, "vectors": False, "images": True}
 }
 ```
 
@@ -357,10 +442,17 @@ indexing_status = {
 if self.metadata_db is not None and hasattr(paper, 'pdf_path'):
     # 尝试存储元数据
     try:
-        success = self.metadata_db.save_paper(paper.doc_id, paper.pdf_path, metadata)
+        success = self.metadata_db.save_paper(paper.doc_id, paper.pdf_path, metadata, paper.text_chunks)
         paper_status["metadata"] = success
+        # 检查文本块存储状态（新增）
+        if success and paper.text_chunks:
+            paper_status["text_chunks"] = True
+        else:
+            paper_status["text_chunks"] = False
     except Exception as e:
         logger.error(f"Failed to store metadata for {paper.doc_id}: {str(e)}")
+        paper_status["metadata"] = False
+        paper_status["text_chunks"] = False
 
 if self.vector_db is not None:
     # 尝试存储向量
@@ -388,8 +480,17 @@ if self.image_db is not None and paper.figure_chunks:
 
 ## 数据检索流程
 
-### 1. 向量搜索
-- 查询文本 → 向量嵌入 → FAISS相似度搜索 → 返回候选文档
+### 1. 先过滤后搜索架构（新方案）
+
+#### MetadataDB 检索流程
+- **第一步：应用过滤器** → 获取候选文档ID列表
+- **第二步：全文搜索** → 在候选文档中进行PostgreSQL全文搜索
+- **优势**：减少搜索范围，提高搜索效率，支持复杂过滤条件
+
+#### VectorDB 检索流程  
+- **第一步：应用过滤器** → 在内存中过滤候选向量条目
+- **第二步：向量搜索** → 在候选条目中进行FAISS相似度搜索
+- **优势**：避免对无关向量进行搜索，提高向量搜索性能
 
 ### 2. 元数据增强
 - 从VectorDB获取相似度分数
@@ -400,6 +501,65 @@ if self.image_db is not None and paper.figure_chunks:
 - 通过doc_id和image_id从MinIO获取图像
 - 支持直接下载或保存到本地
 
+### 4. 全文内容检索
+- 通过doc_id从MetadataDB获取文本块内容
+- 按chunk_order排序恢复原始阅读顺序（chunk_order代表在文档中的顺序）
+- 支持全文搜索和关键词匹配
+- 提供完整的论文内容访问
+
+**新检索实现**
+```python
+def search_and_retrieve_with_filter_first(self, query: str, filters: Dict[str, Any], top_k: int = 5) -> List[Dict]:
+    # 1. 先过滤：获取候选文档ID列表
+    candidate_doc_ids = self.metadata_db.get_filtered_doc_ids(filters)
+    
+    # 2. 后搜索：在候选文档中进行向量搜索
+    vector_results = self.vector_db.search_with_filter_first(query, filters, top_k)
+    
+    # 3. 获取完整信息
+    results = []
+    for entry, score in vector_results:
+        # 获取元数据
+        metadata = self.metadata_db.get_paper_metadata(entry.doc_id)
+        # 获取文本块内容
+        text_chunks = self.metadata_db.get_text_chunks(entry.doc_id)
+        # 获取完整文本
+        full_text = self.metadata_db.get_full_text(entry.doc_id)
+        
+        results.append({
+            "doc_id": entry.doc_id,
+            "metadata": metadata,
+            "text_chunks": text_chunks,
+            "full_text": full_text,
+            "similarity_score": score
+        })
+    
+    return results
+
+# 原有检索方法（已注释，保留备用）
+# def search_and_retrieve(self, query: str, top_k: int = 5) -> List[Dict]:
+#     # 1. 向量搜索获取候选文档
+#     vector_results = self.vector_db.search(query, top_k)
+#     
+#     # 2. 获取完整信息
+#     results = []
+#     for entry, score in vector_results:
+#         # 获取元数据
+#         metadata = self.metadata_db.get_paper_metadata(entry.doc_id)
+#         # 获取文本块内容
+#         text_chunks = self.metadata_db.get_text_chunks(entry.doc_id)
+#         # 获取完整信息
+#         results.append({
+#             "doc_id": entry.doc_id,
+#             "metadata": metadata,
+#             "text_chunks": text_chunks,
+#             "full_text": full_text,
+#             "similarity_score": score
+#         })
+#     
+#     return results
+```
+
 ## 性能特性
 
 ### 存储性能
@@ -408,9 +568,12 @@ if self.image_db is not None and paper.figure_chunks:
 - **内存优化**：向量数据库使用内存索引，快速响应
 
 ### 查询性能
+- **先过滤后搜索**：减少搜索范围，显著提高搜索效率
 - **索引优化**：PostgreSQL全文搜索索引
+- **文本块搜索**：支持文本块内容的全文搜索和关键词匹配，使用chunk_order进行顺序排序
 - **向量缓存**：FAISS索引常驻内存
 - **分层存储**：不同类型数据使用最适合的存储方式
+- **智能过滤**：支持复杂过滤条件，避免对无关数据进行搜索
 
 ### 扩展性
 - **水平扩展**：MinIO支持分布式存储
@@ -457,9 +620,20 @@ if self.image_db is not None and paper.figure_chunks:
 AIgnite Index System的index paper过程采用了**数据分离存储**和**统一检索接口**的架构设计：
 
 1. **数据分离**：不同类型的数据存储到最适合的数据库中
-2. **并行处理**：三个数据库同时工作，最大化性能
-3. **统一接口**：通过doc_id关联，提供一致的检索体验
-4. **容错设计**：单个数据库失败不影响整体功能
-5. **状态跟踪**：完整的操作状态反馈，便于监控和调试
+2. **全文存储**：PostgreSQL存储完整的文本内容，使用doc_id+chunk_id作为唯一标识，支持全文搜索和按chunk_order顺序恢复
+3. **并行处理**：三个数据库同时工作，最大化性能
+4. **统一接口**：通过doc_id关联，提供一致的检索体验
+5. **容错设计**：单个数据库失败不影响整体功能
+6. **状态跟踪**：完整的操作状态反馈，便于监控和调试
 
-这种设计既保证了存储效率，又提供了灵活的搜索能力，形成了一个完整的论文索引和检索系统。 
+### 新架构优势
+
+**先过滤后搜索架构**进一步提升了系统性能：
+
+1. **搜索效率提升**：通过预过滤减少搜索范围，避免对无关数据进行计算
+2. **资源优化**：减少向量搜索的计算量，降低内存和CPU使用
+3. **复杂过滤支持**：支持多维度、多条件的复杂过滤逻辑
+4. **性能可预测**：过滤后的搜索性能更加稳定和可预测
+5. **扩展性增强**：为未来添加更多过滤条件提供了良好的架构基础
+
+这种设计既保证了存储效率，又提供了灵活的搜索能力和完整的文本访问，形成了一个完整的论文索引和检索系统。新的"先过滤后搜索"架构进一步优化了检索性能，使系统能够更高效地处理大规模数据检索需求。 

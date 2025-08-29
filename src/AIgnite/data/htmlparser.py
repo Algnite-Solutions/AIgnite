@@ -94,7 +94,7 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
 
         search = arxiv.Search(
             query=query,
-            max_results=None,  # You can set max papers you want here
+            max_results=1,  # You can set max papers you want here
             sort_by=arxiv.SortCriterion.SubmittedDate
         )
         #print('only 3 papers')
@@ -122,6 +122,7 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
                 published_date=str(result.published),
                 abstract=result.summary,
                 pdf_path=str(os.path.join(self.pdf_folder_path, f'{arxiv_id}.pdf')),
+                comments=result.comment,
                 #Set htmlpath to None first and update it later
                 HTML_path=None 
             )

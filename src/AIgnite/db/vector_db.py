@@ -50,6 +50,10 @@ class VectorDB:
                 logger.warning("Failed to load existing vector database, initializing new one")
         else:
             logger.info("No existing vector database found, initializing new one")
+             # Create directory for new database if it doesn't exist
+            os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+            print(f"Created directory for new vector database at {self.db_path}")
+       
             
         # Initialize new FAISS index and empty entries list if loading failed or database doesn't exist
         self.index = faiss.IndexFlatIP(self.vector_dim)
@@ -184,6 +188,7 @@ class VectorDB:
             self.entries.append(combined_entry)
             self.index.add(combined_entry.vector)
             
+
             # Add abstract vector
             abstract_entry = VectorEntry(
                 doc_id=doc_id,
@@ -212,84 +217,6 @@ class VectorDB:
         except Exception as e:
             logger.error(f"Failed to add document {doc_id} to vector database: {str(e)}")
             return False
-
-    def search(
-        self,
-        query: str,
-        k: int = 5,
-        filters: Optional[Dict[str, Any]] = None
-    ) -> List[Tuple[VectorEntry, float]]:
-        """Search for similar vectors.
-        
-        Args:
-            query: Search query text
-            top_k: Number of results to return
-            filters: Optional filters to apply to search results
-            
-        Returns:
-            List of tuples containing (VectorEntry, similarity_score)
-        """
-        try:
-            if not self.entries:
-                return []
-                
-            # Get query embedding
-            query_vector = self._get_embedding(query)
-            
-            # Search index with more results to account for deduplication
-            k_search = min(k * 3, len(self.entries))  # Search for more results initially
-            distances, indices = self.index.search(
-                query_vector,
-                k=k_search
-            )
-            
-            # Process results with document-level deduplication
-            seen_doc_ids = set()
-            results = []
-            
-            for idx, score in zip(indices[0], distances[0]):
-                if idx >= len(self.entries):  # Safety check
-                    continue
-                    
-                entry = self.entries[idx]
-                
-                # Skip if we've already seen this document
-                if entry.doc_id in seen_doc_ids:
-                    continue
-                
-                # Apply filters if provided
-                if filters:
-                    if "include" in filters or "exclude" in filters:
-                        # New filter structure - apply memory filtering
-                        from ..index.filter_parser import FilterParser
-                        filter_parser = FilterParser()
-                        
-                        # Get metadata for filtering (if available)
-                        def get_field_value(item, field):
-                            if field == "doc_ids":
-                                return item.doc_id
-                            # For other fields, we'd need metadata - for now, skip complex filtering
-                            return None
-                        
-                        # Apply filters to this entry
-                        if not filter_parser.apply_memory_filters([entry], filters, get_field_value):
-                            continue
-                        
-                results.append((entry, float(score)))
-                seen_doc_ids.add(entry.doc_id)
-                
-                # Break if we have enough unique documents
-                if len(results) >= k:
-                    break
-            
-            # Sort by similarity score (higher is better for inner product)
-            results.sort(key=lambda x: x[1], reverse=True)
-            
-            return results[:k]
-            
-        except Exception as e:
-            logging.error(f"Failed to search vector database: {str(e)}")
-            return []
 
     def delete_document(self, doc_id: str) -> bool:
         """Delete all vectors for a document.
@@ -330,4 +257,168 @@ class VectorDB:
             
         except Exception as e:
             logging.error(f"Failed to delete document {doc_id} from vector database: {str(e)}")
-            return False 
+            return False
+
+    def _apply_filters_first(self, filters: Optional[Dict[str, Any]]) -> List[VectorEntry]:
+        """Apply filters first to get candidate vector entries.
+        
+        Args:
+            filters: Filter dictionary with include/exclude conditions
+            
+        Returns:
+            List of vector entries that pass the filters
+        """
+        if not filters:
+            return self.entries
+        
+        try:
+            from ..index.filter_parser import FilterParser
+            filter_parser = FilterParser()
+            
+            # Apply memory filters to this entry
+            def get_field_value(item, field):
+                if field == "doc_ids":
+                    return item.doc_id
+                # For other fields, we'd need metadata - for now, skip complex filtering
+                return None
+            
+            return filter_parser.apply_memory_filters(self.entries, filters, get_field_value)
+            
+        except Exception as e:
+            logger.error(f"Filter application failed: {str(e)}")
+            return self.entries
+
+    def search(
+        self,
+        query: str,
+        filters: Optional[Dict[str, Any]] = None,
+        k: int = 5
+    ) -> List[Tuple[VectorEntry, float]]:
+        """Search for similar vectors with filter-first approach.
+        
+        Args:
+            query: Search query text
+            filters: Optional filters to apply first
+            k: Number of results to return
+            
+        Returns:
+            List of tuples containing (VectorEntry, similarity_score)
+        """
+        try:
+            if not self.entries:
+                return []
+            
+            # Step 1: Apply filters to get candidate entries
+            candidate_entries = self._apply_filters_first(filters)
+            
+            if not candidate_entries:
+                logger.info("No entries match the filters")
+                return []
+            
+            logger.info(f"Filter applied: {len(candidate_entries)} candidate entries")
+            
+            # Step 2: Perform vector search on filtered results
+            query_vector = self._get_embedding(query)
+            
+            # Create temporary index only with candidate vectors
+            temp_vectors = np.vstack([entry.vector for entry in candidate_entries])
+            temp_index = faiss.IndexFlatIP(self.vector_dim)
+            temp_index.add(temp_vectors)
+            
+            # Search temporary index
+            distances, indices = temp_index.search(query_vector, k)
+            
+            # Build results
+            results = []
+            for idx, score in zip(indices[0], distances[0]):
+                if idx < len(candidate_entries):
+                    results.append((candidate_entries[idx], float(score)))
+            
+            # Sort by similarity score (higher is better for inner product)
+            results.sort(key=lambda x: x[1], reverse=True)
+            
+            logger.info(f"Search completed: {len(results)} results found")
+            return results[:k]
+            
+        except Exception as e:
+            logger.error(f"Search with filter first failed: {str(e)}")
+            return []
+
+    # Original search method (commented out, kept for backup)
+    # def search(
+    #     self,
+    #     query: str,
+    #     k: int = 5,
+    #     filters: Optional[Dict[str, Any]] = None
+    # ) -> List[Tuple[VectorEntry, float]]:
+    #     """Search for similar vectors.
+    #     
+    #     Args:
+    #         query: Search query text
+    #         top_k: Number of results to return
+    #         filters: Optional filters to apply to search results
+    #         
+    #     Returns:
+    #         List of tuples containing (VectorEntry, similarity_score)
+    #     """
+    #     try:
+    #         if not self.entries:
+    #             return []
+    #             
+    #         # Get query embedding
+    #         query_vector = self._get_embedding(query)
+    #         
+    #         # Search index with more results to account for deduplication
+    #         k_search = min(k * 3, len(self.entries))  # Search for more results initially
+    #         distances, indices = self.index.search(
+    #             query_vector,
+    #             k=k_search
+    #         )
+    #         
+    #         # Process results with document-level deduplication
+    #         seen_doc_ids = set()
+    #         results = []
+    #         
+    #         for idx, score in zip(indices[0], distances[0]):
+    #             if idx >= len(self.entries):  # Safety check
+    #                 continue
+    #                     
+    #             entry = self.entries[idx]
+    #             
+    #             # Skip if we've already seen this document
+    #             if entry.doc_id in seen_doc_ids:
+    #                 continue
+    #             
+    #             # Apply filters if provided
+    #             if filters:
+    #                 if "include" in filters or "exclude" in filters:
+    #                     # New filter structure - apply memory filtering
+    #                     from ..index.filter_parser import FilterParser
+    #                     filter_parser = FilterParser()
+    #                     
+    #                     # Get metadata for filtering (if available)
+    #                     def get_field_value(item, field):
+    #                         if field == "doc_ids":
+    #                             return item.doc_id
+    #                         # For other fields, we'd need metadata - for now, skip complex filtering
+    #                         return None
+    #                     
+    #                     # Apply filters to this entry
+    #                     if not filter_parser.apply_memory_filters([entry], filters, get_field_value):
+    #                         continue
+    #                         
+    #             results.append((entry, float(score)))
+    #             seen_doc_ids.add(entry.doc_id)
+    #             
+    #             # Break if we have enough unique documents
+    #             if len(results) >= k:
+    #                 break
+    #         
+    #         # Sort by similarity score (higher is better for inner product)
+    #         results.sort(key=lambda x: x[1], reverse=True)
+    #         
+    #         return results[:k]
+    #         
+    #     except Exception as e:
+    #         logging.error(f"Failed to search vector database: {str(e)}")
+    #         return [] 

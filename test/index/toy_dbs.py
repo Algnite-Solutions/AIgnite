@@ -211,7 +211,7 @@ class ToyMetadataDB(MetadataDB):
         self.metadata = {}  # doc_id -> metadata
         self.pdfs = {}      # doc_id -> pdf_content
         
-    def save_paper(self, doc_id: str, pdf_path: str, metadata: Dict[str, Any]) -> bool:
+    def save_paper(self, doc_id: str, pdf_path: str, metadata: Dict[str, Any], text_chunks: Optional[List] = None) -> bool:
         """Store paper metadata and PDF content in memory."""
         try:
             # Read and store PDF content
@@ -219,6 +219,13 @@ class ToyMetadataDB(MetadataDB):
                 self.pdfs[doc_id] = f.read()
             # Store metadata
             self.metadata[doc_id] = metadata.copy()  # Make a copy to avoid reference issues
+            
+            # Store text chunks content if available
+            if text_chunks:
+                chunk_success = self._save_text_chunks(doc_id, text_chunks)
+                if not chunk_success:
+                    return False
+            
             return True
         except Exception:
             return False
@@ -342,6 +349,121 @@ class ToyMetadataDB(MetadataDB):
         if not meta:
             return None
         return meta.get('blog')
+
+    def _save_text_chunks(self, doc_id: str, text_chunks: List) -> bool:
+        """Save text chunk content to memory storage."""
+        try:
+            if 'text_chunks_content' not in self.metadata[doc_id]:
+                self.metadata[doc_id]['text_chunks_content'] = {}
+            
+            for chunk in text_chunks:
+                chunk_order = self._extract_order(chunk.id)
+                self.metadata[doc_id]['text_chunks_content'][chunk.id] = {
+                    'text': chunk.text,
+                    'order': chunk_order
+                }
+            return True
+        except Exception:
+            return False
+
+    def _extract_order(self, chunk_id: str) -> int:
+        """Extract order number from chunk_id for sorting."""
+        import re
+        match = re.search(r'(\d+)$', chunk_id)
+        return int(match.group(1)) if match else 0
+
+    def get_text_chunks(self, doc_id: str) -> List[Dict[str, Any]]:
+        """Retrieve text chunks for a document from memory.
+        
+        Args:
+            doc_id: Document ID
+            
+        Returns:
+            List of text chunks with metadata, ordered by chunk_order
+        """
+        metadata = self.metadata.get(doc_id)
+        if not metadata or 'text_chunks_content' not in metadata:
+            return []
+        
+        # Get text chunks with content
+        text_chunks_content = metadata['text_chunks_content']
+        chunks = []
+        
+        # Sort by chunk_order
+        sorted_chunks = sorted(text_chunks_content.items(), 
+                              key=lambda x: x[1]['order'])
+        
+        for chunk_id, chunk_data in sorted_chunks:
+            chunks.append({
+                'chunk_id': chunk_id,
+                'text_content': chunk_data['text'],
+                'chunk_order': chunk_data['order'],
+                'created_at': None  # Not tracked in toy implementation
+            })
+        
+        return chunks
+
+    def get_full_text(self, doc_id: str) -> Optional[str]:
+        """Retrieve the complete text content of a document by concatenating all text chunks.
+        
+        Args:
+            doc_id: Document ID
+            
+        Returns:
+            Complete text content as string, or None if not found
+        """
+        chunks = self.get_text_chunks(doc_id)
+        if not chunks:
+            return None
+        
+        # Concatenate chunks in order with proper spacing
+        return '\n\n'.join([chunk['text_content'] for chunk in chunks])
+
+    def search_in_chunks(self, query: str, top_k: int = 10, similarity_cutoff: float = 0.1) -> List[Dict[str, Any]]:
+        """Search within text chunk content using simple text matching.
+        
+        Args:
+            query: Search query string
+            top_k: Maximum number of results to return
+            similarity_cutoff: Minimum similarity score threshold
+            
+        Returns:
+            List of search results with chunk information
+        """
+        try:
+            query_terms = set(query.lower().split())
+            results = []
+            
+            for doc_id, metadata in self.metadata.items():
+                if 'text_chunks_content' not in metadata:
+                    continue
+                
+                text_chunks_content = metadata['text_chunks_content']
+                for chunk_id, chunk_data in text_chunks_content.items():
+                    chunk_text = chunk_data['text'].lower()
+                    chunk_terms = set(chunk_text.split())
+                    
+                    # Calculate simple similarity score
+                    matching_terms = query_terms.intersection(chunk_terms)
+                    if matching_terms:
+                        score = len(matching_terms) / len(query_terms)
+                        if score >= similarity_cutoff:
+                            results.append({
+                                'doc_id': doc_id,
+                                'chunk_id': chunk_id,
+                                'chunk_order': chunk_data['order'],
+                                'text_content': chunk_data['text'],
+                                'score': score,
+                                'matched_text': chunk_data['text']  # For simplicity, return full chunk text
+                            })
+            
+            # Sort by score and return top_k
+            results.sort(key=lambda x: x['score'], reverse=True)
+            return results[:top_k]
+            
+        except Exception as e:
+            logger.error(f"Chunk search failed: {str(e)}")
+            return []
 
 class ToyImageDB(MinioImageDB):
     """A toy image database for testing that stores everything in memory."""

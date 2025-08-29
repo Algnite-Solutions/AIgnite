@@ -131,11 +131,10 @@ class PaperIndexer(BaseIndexer):
                     "figure_ids": [chunk.id for chunk in paper.figure_chunks],
                     "comments": paper.comments  # Store comments field
                 }
-                
                 # Store metadata if database is available
                 if self.metadata_db is not None and hasattr(paper, 'pdf_path'):
                     try:
-                        success = self.metadata_db.save_paper(paper.doc_id, paper.pdf_path, metadata)
+                        success = self.metadata_db.save_paper(paper.doc_id, paper.pdf_path, metadata,paper.text_chunks)
                         paper_status["metadata"] = success
                         logger.debug(f"Stored paper metadata for {paper.doc_id}: {success}")
                     except Exception as e:
