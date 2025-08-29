@@ -116,6 +116,7 @@ class PaperIndexer(BaseIndexer):
             for paper in tqdm(papers, desc="Indexing papers", unit="paper"):
                 paper_status = {
                     "metadata": False,
+                    "text_chunks": False,   # 文本块存储状态（新增）
                     "vectors": False,
                     "images": False
                 }
@@ -136,9 +137,16 @@ class PaperIndexer(BaseIndexer):
                     try:
                         success = self.metadata_db.save_paper(paper.doc_id, paper.pdf_path, metadata,paper.text_chunks)
                         paper_status["metadata"] = success
+                        # 检查文本块存储状态（新增）
+                        if success and paper.text_chunks:
+                            paper_status["text_chunks"] = True
+                        else:
+                            paper_status["text_chunks"] = False
                         logger.debug(f"Stored paper metadata for {paper.doc_id}: {success}")
                     except Exception as e:
                         logger.error(f"Failed to store metadata for {paper.doc_id}: {str(e)}")
+                        paper_status["metadata"] = False
+                        paper_status["text_chunks"] = False
                 
                 # Store vectors if database is available
                 if self.vector_db is not None:
@@ -311,6 +319,7 @@ class PaperIndexer(BaseIndexer):
         """
         deletion_status = {
             "metadata": False,
+            "text_chunks": False,   # 文本块存储状态（新增）
             "vectors": False,
             "images": False
         }

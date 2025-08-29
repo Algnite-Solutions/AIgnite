@@ -514,7 +514,7 @@ def search_and_retrieve_with_filter_first(self, query: str, filters: Dict[str, A
     candidate_doc_ids = self.metadata_db.get_filtered_doc_ids(filters)
     
     # 2. 后搜索：在候选文档中进行向量搜索
-    vector_results = self.vector_db.search_with_filter_first(query, filters, top_k)
+    vector_results = self.vector_db.search(query, filters, top_k)
     
     # 3. 获取完整信息
     results = []
