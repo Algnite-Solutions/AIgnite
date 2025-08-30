@@ -74,7 +74,7 @@ class TestPaperIndexerWithToyDBs(unittest.TestCase):
                 metadata={},
                 pdf_path=cls.test_pdfs["pdf1"],
                 HTML_path=None,
-                comments=None
+                comments='111'
             ),
             DocSet(
                 doc_id="2106.14835",
@@ -95,7 +95,7 @@ class TestPaperIndexerWithToyDBs(unittest.TestCase):
                 metadata={},
                 pdf_path=cls.test_pdfs["pdf2"],
                 HTML_path=None,
-                comments=None
+                comments='1111'
             ),
             DocSet(
                 doc_id="2106.14836",
@@ -553,6 +553,192 @@ class TestPaperIndexerWithToyDBs(unittest.TestCase):
         print("✅ Non-existent doc_ids in exclude filter working correctly")
         
         print("✅ All filtering functionality tests with filter_parser passed!")
+        
+        # Test 7.1: Advanced filtering with text_type and published_date
+        print("✅ Test 7.1: Testing advanced filtering with text_type and published_date...")
+        self.indexer.set_search_strategy('vector')
+        
+        # Test 7.1.1: text_type filtering
+        print("✅ Test 7.1.1: Testing text_type filtering...")
+        
+        # Test include filter for abstract only
+        results_abstract_only = self.indexer.find_similar_papers(
+            query="language models",
+            top_k=5,
+            filters={
+                "include": {
+                    "text_type": ["abstract"]
+                }
+            },
+            strategy_type='vector'
+        )
+        print(f"Vector search with abstract-only filter: {len(results_abstract_only)} results")
+        
+        # Verify abstract-only filtering works
+        if results_abstract_only:
+            # All results should have text_type as abstract
+            for result in results_abstract_only:
+                self.assertIn("text_type", result.get("metadata", {}))
+                self.assertEqual(result["metadata"]["text_type"], "abstract")
+            print("✅ Abstract-only filtering working correctly")
+        
+        # Test exclude filter for chunk text
+        results_no_chunks = self.indexer.find_similar_papers(
+            query="language models",
+            top_k=5,
+            filters={
+                "exclude": {
+                    "text_type": ["chunk"]
+                }
+            },
+            strategy_type='vector'
+        )
+        print(f"Vector search excluding chunks: {len(results_no_chunks)} results")
+        
+        # Verify chunk exclusion works
+        if results_no_chunks:
+            for result in results_no_chunks:
+                self.assertIn("text_type", result.get("metadata", {}))
+                self.assertNotEqual(result["metadata"]["text_type"], "chunk")
+            print("✅ Chunk exclusion filtering working correctly")
+        
+        # Test combined text_type filtering
+        results_combined_types = self.indexer.find_similar_papers(
+            query="language models",
+            top_k=5,
+            filters={
+                "include": {
+                    "text_type": ["abstract", "combined"]
+                },
+                "exclude": {
+                    "text_type": ["chunk"]
+                }
+            },
+            strategy_type='vector'
+        )
+        print(f"Vector search with combined text_type filters: {len(results_combined_types)} results")
+        
+        # Verify combined text_type filtering works
+        if results_combined_types:
+            for result in results_combined_types:
+                self.assertIn("text_type", result.get("metadata", {}))
+                text_type = result["metadata"]["text_type"]
+                self.assertIn(text_type, ["abstract", "combined"])
+                self.assertNotEqual(text_type, "chunk")
+            print("✅ Combined text_type filtering working correctly")
+        
+        # Test 7.1.2: published_date filtering
+        print("✅ Test 7.1.2: Testing published_date filtering...")
+        
+        # Test exact date filtering
+        results_exact_date = self.indexer.find_similar_papers(
+            query="language models",
+            top_k=5,
+            filters={
+                "include": {
+                    "published_date": ["2021-06-30"]
+                }
+            },
+            strategy_type='vector'
+        )
+        print(f"Vector search with exact date filter: {len(results_exact_date)} results")
+        
+        # Verify exact date filtering works
+        if results_exact_date:
+            for result in results_exact_date:
+                doc_id = result['doc_id']
+                # Get metadata to check published_date
+                metadata = self.indexer.metadata_db.get_metadata(doc_id)
+                if metadata:
+                    self.assertEqual(metadata["published_date"], "2021-06-30")
+            print("✅ Exact date filtering working correctly")
+        
+        # Test date range filtering
+        results_date_range = self.indexer.find_similar_papers(
+            query="language models",
+            top_k=5,
+            filters={
+                "include": {
+                    "published_date": ["2021-06-28", "2021-06-30"]
+                }
+            },
+            strategy_type='vector'
+        )
+        print(f"Vector search with date range filter: {len(results_date_range)} results")
+        
+        # Verify date range filtering works
+        if results_date_range:
+            for result in results_date_range:
+                doc_id = result['doc_id']
+                metadata = self.indexer.metadata_db.get_metadata(doc_id)
+                if metadata:
+                    published_date = metadata["published_date"]
+                    # Should be between 2021-06-28 and 2021-06-30
+                    self.assertIn(published_date, ["2021-06-28", "2021-06-30"])
+            print("✅ Date range filtering working correctly")
+        
+        # Test date exclusion filtering
+        results_date_exclude = self.indexer.find_similar_papers(
+            query="language models",
+            top_k=5,
+            filters={
+                "exclude": {
+                    "published_date": ["2021-07-01", "2021-07-02"]
+                }
+            },
+            strategy_type='vector'
+        )
+        print(f"Vector search with date exclusion filter: {len(results_date_exclude)} results")
+        
+        # Verify date exclusion filtering works
+        if results_date_exclude:
+            for result in results_date_exclude:
+                doc_id = result['doc_id']
+                metadata = self.indexer.metadata_db.get_metadata(doc_id)
+                if metadata:
+                    published_date = metadata["published_date"]
+                    # Should not be in excluded date range
+                    self.assertNotIn(published_date, ["2021-07-01", "2021-07-02"])
+            print("✅ Date exclusion filtering working correctly")
+        
+        # Test 7.1.3: Combined advanced filtering
+        print("✅ Test 7.1.3: Testing combined advanced filtering...")
+        
+        # Test text_type + published_date combination
+        results_combined_advanced = self.indexer.find_similar_papers(
+            query="language models",
+            top_k=5,
+            filters={
+                "include": {
+                    "text_type": ["abstract"],
+                    "published_date": ["2021-06-28", "2021-06-30"]
+                },
+                "exclude": {
+                    "text_type": ["chunk"]
+                }
+            },
+            strategy_type='vector'
+        )
+        print(f"Vector search with combined advanced filters: {len(results_combined_advanced)} results")
+        
+        # Verify combined advanced filtering works
+        if results_combined_advanced:
+            for result in results_combined_advanced:
+                # Check text_type
+                self.assertIn("text_type", result.get("metadata", {}))
+                text_type = result["metadata"]["text_type"]
+                self.assertEqual(text_type, "abstract")
+                self.assertNotEqual(text_type, "chunk")
+                
+                # Check published_date
+                doc_id = result['doc_id']
+                metadata = self.indexer.metadata_db.get_metadata(doc_id)
+                if metadata:
+                    published_date = metadata["published_date"]
+                    self.assertIn(published_date, ["2021-06-28", "2021-06-30"])
+            print("✅ Combined advanced filtering working correctly")
+        
+        print("✅ All advanced filtering tests passed!")
 
     def test_8_full_text_storage_and_retrieval(self):
         """Test full-text storage, retrieval, and deletion functionality."""

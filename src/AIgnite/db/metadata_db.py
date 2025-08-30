@@ -672,19 +672,40 @@ class MetadataDB:
         """
         session = self.Session()
         try:
-            # Step 1: Apply filters to get candidate doc_ids
-            candidate_doc_ids = self.get_filtered_doc_ids(filters)
-            
-            if not candidate_doc_ids:
-                logger.info("No documents match the filters")
-                return []
-            
-            logger.info(f"Filter applied: {len(candidate_doc_ids)} candidate documents")
-            
-            # Step 2: Perform full-text search on filtered results
+            # Step 1: Apply filters to get candidate doc_ids (if filters provided)
+            if filters:
+                candidate_doc_ids = self.get_filtered_doc_ids(filters)
+                
+                if not candidate_doc_ids:
+                    logger.info("No documents match the filters")
+                    return []
+                
+                logger.info(f"Filter applied: {len(candidate_doc_ids)} candidate documents")
+                # Step 2: Perform full-text search on filtered results
+            else:
+                candidate_doc_ids = None
+                logger.info("No filters provided, searching all documents")
+                # Step 2: Perform full-text search on all documents
             or_query = ' | '.join(query.split())
             
-            search_results = session.execute(text("""
+            # Build WHERE clause based on whether filters are applied
+            if candidate_doc_ids:
+                where_clause = "doc_id = ANY(:candidate_doc_ids) AND to_tsvector('english', coalesce(title, '') || ' ' || coalesce(abstract, '')) @@ to_tsquery('english', :query)"
+                query_params = {
+                    'query': or_query,
+                    'candidate_doc_ids': candidate_doc_ids,
+                    'cutoff': similarity_cutoff,
+                    'limit': top_k
+                }
+            else:
+                where_clause = "to_tsvector('english', coalesce(title, '') || ' ' || coalesce(abstract, '')) @@ to_tsquery('english', :query)"
+                query_params = {
+                    'query': or_query,
+                    'cutoff': similarity_cutoff,
+                    'limit': top_k
+                }
+            
+            search_results = session.execute(text(f"""
                 WITH search_results AS (
                     SELECT
                         doc_id,
@@ -706,20 +727,14 @@ class MetadataDB:
                             'StartSel=<mark>, StopSel=</mark>, MaxWords=50, MinWords=20'
                         ) as headline
                     FROM papers
-                    WHERE doc_id = ANY(:candidate_doc_ids)
-                    AND to_tsvector('english', coalesce(title, '') || ' ' || coalesce(abstract, '')) @@ to_tsquery('english', :query)
+                    WHERE {where_clause}
                 )
                 SELECT *
                 FROM search_results
                 WHERE score >= :cutoff
                 ORDER BY score DESC
                 LIMIT :limit
-            """), {
-                'query': or_query,
-                'candidate_doc_ids': candidate_doc_ids,
-                'cutoff': similarity_cutoff,
-                'limit': top_k
-            })
+            """), query_params)
             
             # Process results
             results = []
@@ -740,7 +755,10 @@ class MetadataDB:
                 results.append(result_dict)
                 logger.debug(f"Found result: {result_dict['doc_id']} with score {result_dict['score']}")
 
-            logger.info(f"Search completed: {len(results)} results found")
+            if candidate_doc_ids:
+                logger.info(f"Search completed with filters: {len(results)} results found from {len(candidate_doc_ids)} candidate documents")
+            else:
+                logger.info(f"Search completed without filters: {len(results)} results found from all documents")
             return results
 
         except Exception as e:

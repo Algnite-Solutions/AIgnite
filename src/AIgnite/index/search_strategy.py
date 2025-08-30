@@ -71,7 +71,8 @@ class VectorSearchStrategy(SearchStrategy):
             for entry, score in vector_results:
                 if score < similarity_cutoff:
                     continue
-                    
+                
+                
                 results.append(SearchResult(
                     doc_id=entry.doc_id,
                     score=score,

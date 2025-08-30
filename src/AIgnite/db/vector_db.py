@@ -279,6 +279,8 @@ class VectorDB:
             def get_field_value(item, field):
                 if field == "doc_ids":
                     return item.doc_id
+                elif field == "text_type":
+                    return item.text_type
                 # For other fields, we'd need metadata - for now, skip complex filtering
                 return None
             
@@ -298,7 +300,7 @@ class VectorDB:
         
         Args:
             query: Search query text
-            filters: Optional filters to apply first
+            filters: Optional filters to apply first (supports text_type, doc_ids, etc.)
             k: Number of results to return
             
         Returns:
@@ -326,7 +328,9 @@ class VectorDB:
             temp_index.add(temp_vectors)
             
             # Search temporary index
-            distances, indices = temp_index.search(query_vector, k)
+            k_search = min(k, len(candidate_entries))
+            distances, indices = temp_index.search(query_vector, k_search)
+            #distances, indices = temp_index.search(query_vector, k)
             
             # Build results
             results = []

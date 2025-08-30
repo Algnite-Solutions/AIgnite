@@ -492,16 +492,359 @@ if self.image_db is not None and paper.figure_chunks:
 - **第二步：向量搜索** → 在候选条目中进行FAISS相似度搜索
 - **优势**：避免对无关向量进行搜索，提高向量搜索性能
 
-### 2. 元数据增强
+## 过滤器系统详解
+
+### 支持的过滤字段
+
+AIgnite Index System的过滤器系统支持以下字段的过滤操作：
+
+#### 1. 基础字段过滤
+- **`doc_ids`**: 按文档ID过滤，支持包含和排除操作
+- **`categories`**: 按论文分类过滤（如cs.AI、cs.CL等）
+- **`authors`**: 按作者名称过滤，支持模糊匹配
+- **`published_date`**: 按发布日期过滤，支持精确日期和日期范围
+
+#### 2. 文本内容过滤
+- **`title_keywords`**: 按标题关键词过滤
+- **`abstract_keywords`**: 按摘要关键词过滤
+- **`text_type`**: 按文本类型过滤，支持三种类型：
+  - `abstract`: 论文摘要
+  - `chunk`: 文本块内容
+  - `combined`: 标题+分类+摘要的组合
+
+### 过滤器语法结构
+
+过滤器采用统一的include/exclude结构，支持复杂的组合条件：
+
+```python
+filters = {
+    "include": {
+        "categories": ["cs.AI", "cs.CL"],
+        "text_type": ["abstract", "combined"],
+        "authors": ["John Smith"],
+        "published_date": ["2023-01-01", "2024-01-01"]  # 日期范围
+    },
+    "exclude": {
+        "text_type": ["chunk"],
+        "doc_ids": ["paper_001", "paper_002"]
+    }
+}
+```
+
+### 过滤器实现机制
+
+#### 1. FilterParser核心功能
+
+**字段验证**
+```python
+class FilterParser:
+    def __init__(self):
+        self.supported_fields = {
+            'categories', 'authors', 'published_date', 'doc_ids',
+            'title_keywords', 'abstract_keywords', 'text_type'
+        }
+    
+    def _validate_list_filter(self, value: Any, field: str) -> Optional[List[str]]:
+        if field == "text_type":
+            # 验证text_type值是否有效
+            valid_types = {'abstract', 'chunk', 'combined'}
+            if isinstance(value, str):
+                return [value] if value in valid_types else None
+            elif isinstance(value, list):
+                if all(t in valid_types for t in value):
+                    return value
+                else:
+                    logger.error(f"Invalid text_type values: {value}")
+                    return None
+        # ... 其他字段处理逻辑
+```
+
+**SQL条件生成**
+```python
+def get_sql_conditions(self, filters: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+    """为MetadataDB生成SQL WHERE条件"""
+    # 支持PostgreSQL特定的操作符
+    # categories: JSON数组包含查询 (?|)
+    # authors: ILIKE模糊匹配
+    # published_date: BETWEEN范围查询
+    # title_keywords/abstract_keywords: ILIKE关键词匹配
+```
+
+**内存过滤**
+```python
+def apply_memory_filters(self, items: List[Any], filters: Dict[str, Any], 
+                       get_field_value: callable) -> List[Any]:
+    """为VectorDB应用内存过滤"""
+    # 支持text_type、doc_ids等字段的内存过滤
+    # 适用于向量数据库的快速过滤
+```
+
+#### 2. MetadataDB过滤器应用
+
+**先过滤后搜索架构**
+```python
+def search_papers(self, query: str, filters: Optional[Dict[str, Any]] = None, 
+                 top_k: int = 10, similarity_cutoff: float = 0.1):
+    # 第一步：应用过滤器获取候选文档ID列表
+    candidate_doc_ids = self.get_filtered_doc_ids(filters)
+    
+    if not candidate_doc_ids:
+        return []
+    
+    # 第二步：在候选文档中进行全文搜索
+    search_results = session.execute(text("""
+        SELECT * FROM papers 
+        WHERE doc_id = ANY(:candidate_doc_ids)
+        AND to_tsvector('english', title || ' ' || abstract) @@ to_tsquery('english', :query)
+    """), {'candidate_doc_ids': candidate_doc_ids, 'query': query})
+```
+
+**SQL过滤条件示例**
+```sql
+-- 按分类过滤
+WHERE categories ?| ARRAY['cs.AI', 'cs.CL']
+
+-- 按作者过滤
+WHERE authors::text ILIKE '%John Smith%'
+
+-- 按日期范围过滤
+WHERE published_date BETWEEN '2023-01-01' AND '2024-01-01'
+
+-- 按标题关键词过滤
+WHERE title ILIKE '%machine learning%'
+```
+
+#### 3. VectorDB过滤器应用
+
+**内存过滤机制**
+```python
+def _apply_filters_first(self, filters: Optional[Dict[str, Any]]) -> List[VectorEntry]:
+    """先应用过滤器获取候选向量条目"""
+    if not filters:
+        return self.entries
+    
+    def get_field_value(item, field):
+        if field == "doc_ids":
+            return item.doc_id
+        elif field == "text_type":
+            return item.text_type
+        return None
+    
+    # 使用FilterParser进行内存过滤
+    return filter_parser.apply_memory_filters(self.entries, filters, get_field_value)
+```
+
+**向量搜索优化**
+```python
+def search(self, query: str, filters: Optional[Dict[str, Any]] = None, k: int = 5):
+    # 第一步：应用过滤器获取候选条目
+    candidate_entries = self._apply_filters_first(filters)
+    
+    if not candidate_entries:
+        return []
+    
+    # 第二步：在候选条目中进行向量搜索
+    temp_vectors = np.vstack([entry.vector for entry in candidate_entries])
+    temp_index = faiss.IndexFlatIP(self.vector_dim)
+    temp_index.add(temp_vectors)
+    
+    # 搜索临时索引，避免对无关向量进行计算
+    distances, indices = temp_index.search(query_vector, k_search)
+```
+
+### 过滤器性能优化
+
+#### 1. 先过滤后搜索架构优势
+
+**MetadataDB性能提升**
+- 通过SQL过滤减少需要搜索的文档数量
+- 避免对无关文档进行全文搜索计算
+- 利用PostgreSQL索引优化过滤性能
+
+**VectorDB性能提升**
+- 通过内存过滤减少向量搜索范围
+- 避免对无关向量进行相似度计算
+- 创建临时索引，优化小规模向量搜索
+
+#### 2. 索引优化
+
+**PostgreSQL索引**
+```sql
+-- 分类索引
+CREATE INDEX idx_categories ON papers USING GIN (categories);
+
+-- 作者索引
+CREATE INDEX idx_authors ON papers USING GIN (authors);
+
+-- 日期索引
+CREATE INDEX idx_published_date ON papers (published_date);
+
+-- 全文搜索索引
+CREATE INDEX idx_fts ON papers 
+USING gin(to_tsvector('english', title || ' ' || abstract));
+```
+
+**向量数据库优化**
+- 支持doc_ids快速过滤
+- text_type字段的内存索引
+- 临时索引的智能创建和销毁
+
+### 过滤器使用示例
+
+#### 1. 基础过滤
+```python
+# 只搜索AI和机器学习相关论文
+filters = {
+    "include": {
+        "categories": ["cs.AI", "cs.LG", "cs.CL"]
+    }
+}
+
+# 排除特定论文
+filters = {
+    "exclude": {
+        "doc_ids": ["paper_001", "paper_002"]
+    }
+}
+```
+
+#### 2. 文本类型过滤
+```python
+# 只搜索摘要和组合文本
+filters = {
+    "include": {
+        "text_type": ["abstract", "combined"]
+    }
+}
+
+# 排除文本块，只搜索摘要
+filters = {
+    "include": {
+        "text_type": ["abstract"]
+    },
+    "exclude": {
+        "text_type": ["chunk"]
+    }
+}
+```
+
+#### 3. 复杂组合过滤
+```python
+# 多条件组合过滤
+filters = {
+    "include": {
+        "categories": ["cs.AI"],
+        "text_type": ["abstract"],
+        "authors": ["John Smith"],
+        "published_date": ["2023-01-01", "2024-01-01"]
+    },
+    "exclude": {
+        "text_type": ["chunk"],
+        "doc_ids": ["paper_001"]
+    }
+}
+```
+
+### 过滤器系统架构优势
+
+#### 1. 统一接口设计
+- 所有搜索策略（Vector、TF-IDF、Hybrid）使用相同的filter接口
+- 减少代码重复，提高维护性
+- 为未来添加更多过滤条件提供良好基础
+
+#### 2. 性能可预测性
+- 过滤后的搜索性能更加稳定和可预测
+- 避免对无关数据进行计算，提高资源利用率
+- 支持复杂过滤逻辑，满足多样化搜索需求
+
+#### 3. 扩展性增强
+- 支持新的过滤字段和操作符
+- 兼容不同的数据库类型（SQL、内存、向量）
+- 为高级搜索功能提供基础支持
+
+### 2. 搜索策略中的过滤器应用
+
+#### VectorSearchStrategy
+```python
+class VectorSearchStrategy(SearchStrategy):
+    def search(self, query: str, top_k: int, filters: Optional[Dict[str, Any]] = None, 
+               similarity_cutoff: float = 0.5, **kwargs):
+        # 直接使用vector_db的search方法，支持filters参数
+        vector_results = self.vector_db.search(query, k=top_k, filters=filters)
+        
+        # 过滤结果并转换为标准格式
+        results = []
+        for entry, score in vector_results:
+            if score < similarity_cutoff:
+                continue
+            
+            results.append(SearchResult(
+                doc_id=entry.doc_id,
+                score=score,
+                metadata={
+                    "vector_score": score,
+                    "text": entry.text,
+                    "text_type": entry.text_type,  # 支持text_type过滤
+                    "chunk_id": entry.chunk_id
+                },
+                search_method="vector",
+                matched_text=entry.text,
+                chunk_id=entry.chunk_id
+            ))
+```
+
+#### TFIDFSearchStrategy
+```python
+class TFIDFSearchStrategy(SearchStrategy):
+    def search(self, query: str, top_k: int, filters: Optional[Dict[str, Any]] = None, 
+               similarity_cutoff: float = 0.1, **kwargs):
+        # 使用metadata_db的search_papers方法，支持filters参数
+        search_results = self.metadata_db.search_papers(
+            query=query,
+            top_k=top_k,
+            similarity_cutoff=similarity_cutoff,
+            filters=filters  # 支持所有MetadataDB过滤字段
+        )
+        
+        # 转换为标准格式
+        results = []
+        for result in search_results:
+            results.append(SearchResult(
+                doc_id=result['doc_id'],
+                score=result['score'],
+                metadata=result['metadata'],
+                search_method='tf-idf',
+                matched_text=result['matched_text']
+            ))
+```
+
+#### HybridSearchStrategy
+```python
+class HybridSearchStrategy(SearchStrategy):
+    def search(self, query: str, top_k: int, filters: Optional[Dict[str, Any]] = None, 
+               similarity_cutoff: float = 0.5, **kwargs):
+        # 两个策略都使用相同的filters参数
+        vector_results = self.vector_strategy.search(
+            query, top_k * 2, filters, similarity_cutoff
+        )
+        tfidf_results = self.tfidf_strategy.search(
+            query, top_k * 2, filters, similarity_cutoff
+        )
+        
+        # 合并结果，保持过滤器的一致性
+        # ... 结果合并逻辑
+```
+
+### 3. 元数据增强
 - 从VectorDB获取相似度分数
 - 从MetadataDB获取完整论文信息
 - 合并结果并排序
 
-### 3. 图像访问
+### 4. 图像访问
 - 通过doc_id和image_id从MinIO获取图像
 - 支持直接下载或保存到本地
 
-### 4. 全文内容检索
+### 5. 全文内容检索
 - 通过doc_id从MetadataDB获取文本块内容
 - 按chunk_order排序恢复原始阅读顺序（chunk_order代表在文档中的顺序）
 - 支持全文搜索和关键词匹配
@@ -569,11 +912,19 @@ def search_and_retrieve_with_filter_first(self, query: str, filters: Dict[str, A
 
 ### 查询性能
 - **先过滤后搜索**：减少搜索范围，显著提高搜索效率
+  - MetadataDB：通过SQL过滤减少需要搜索的文档数量
+  - VectorDB：通过内存过滤减少向量搜索范围
+  - 避免对无关数据进行计算，提高资源利用率
 - **索引优化**：PostgreSQL全文搜索索引
+  - 分类、作者、日期等字段的专用索引
+  - 全文搜索的GIN索引优化
 - **文本块搜索**：支持文本块内容的全文搜索和关键词匹配，使用chunk_order进行顺序排序
 - **向量缓存**：FAISS索引常驻内存
 - **分层存储**：不同类型数据使用最适合的存储方式
 - **智能过滤**：支持复杂过滤条件，避免对无关数据进行搜索
+  - 支持include/exclude逻辑组合
+  - 支持多字段联合过滤
+  - 支持text_type、doc_ids等特殊字段过滤
 
 ### 扩展性
 - **水平扩展**：MinIO支持分布式存储
@@ -636,4 +987,19 @@ AIgnite Index System的index paper过程采用了**数据分离存储**和**统�
 4. **性能可预测**：过滤后的搜索性能更加稳定和可预测
 5. **扩展性增强**：为未来添加更多过滤条件提供了良好的架构基础
 
-这种设计既保证了存储效率，又提供了灵活的搜索能力和完整的文本访问，形成了一个完整的论文索引和检索系统。新的"先过滤后搜索"架构进一步优化了检索性能，使系统能够更高效地处理大规模数据检索需求。 
+### 过滤器系统核心特性
+
+**统一的过滤接口**为系统提供了强大的搜索能力：
+
+1. **多字段支持**：支持doc_ids、categories、authors、published_date、title_keywords、abstract_keywords、text_type等字段
+2. **灵活的逻辑组合**：支持include/exclude逻辑，可组合多个过滤条件
+3. **跨数据库兼容**：MetadataDB使用SQL过滤，VectorDB使用内存过滤，保持接口一致性
+4. **性能优化**：通过预过滤减少搜索范围，显著提升搜索性能
+5. **搜索策略统一**：所有搜索策略（Vector、TF-IDF、Hybrid）使用相同的filter接口
+
+**text_type过滤**是系统的特色功能：
+- 支持`abstract`（论文摘要）、`chunk`（文本块）、`combined`（标题+分类+摘要组合）三种类型
+- 可精确控制搜索的文本类型，避免无关结果
+- 与向量数据库的text_type字段完美集成
+
+这种设计既保证了存储效率，又提供了灵活的搜索能力和完整的文本访问，形成了一个完整的论文索引和检索系统。新的"先过滤后搜索"架构和统一的过滤器系统进一步优化了检索性能，使系统能够更高效地处理大规模数据检索需求，同时提供了丰富的过滤选项来满足多样化的搜索需求。 

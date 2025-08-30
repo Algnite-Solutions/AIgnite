@@ -11,34 +11,30 @@ class FilterParser:
         """Initialize the filter parser."""
         self.supported_fields = {
             'categories', 'authors', 'published_date', 'doc_ids',
-            'title_keywords', 'abstract_keywords'
+            'title_keywords', 'abstract_keywords', 'text_type'  # 新增text_type支持
         }
     
-    def parse_filters(self, filters: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    def parse_filters(self, filters: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         """Parse and validate filter conditions.
         
         Args:
             filters: Raw filter dictionary
             
         Returns:
-            Parsed and validated filter structure
+            Parsed and validated filter structure, or None if no filters provided
             
         Raises:
             ValueError: If filter structure is invalid
         """
-        # Always return the standard structure
-        parsed_filters = {
-            "include": {},
-            "exclude": {}
-        }
-        
+        # Return None for no filters (None or empty dict)
         if not filters:
-            return parsed_filters
-            
+            return None
+        
         # Validate filter structure
         if not isinstance(filters, dict):
             raise ValueError("Filters must be a dictionary")
             
+        # Initialize parsed filters structure
         parsed_filters = {
             "include": {},
             "exclude": {}
@@ -57,6 +53,10 @@ class FilterParser:
             if not isinstance(exclude_filters, dict):
                 raise ValueError("Exclude filters must be a dictionary")
             parsed_filters["exclude"] = self._validate_field_filters(exclude_filters, "exclude")
+        
+        # Check if the parsed filters actually contain any meaningful content
+        if not parsed_filters["include"] and not parsed_filters["exclude"]:
+            return None
             
         return parsed_filters
     
@@ -82,7 +82,7 @@ class FilterParser:
                 
             if field == "published_date":
                 validated_value = self._validate_date_filter(value, filter_type)
-            elif field in ["categories", "authors", "doc_ids", "title_keywords", "abstract_keywords"]:
+            elif field in ["categories", "authors", "doc_ids", "title_keywords", "abstract_keywords", "text_type"]:
                 validated_value = self._validate_list_filter(value, field)
             else:
                 logger.warning(f"Unknown field type for {field}")
@@ -137,6 +137,22 @@ class FilterParser:
         Returns:
             Validated list or None if invalid
         """
+        if field == "text_type":
+            # 验证text_type值是否有效
+            valid_types = {'abstract', 'chunk', 'combined'}
+            if isinstance(value, str):
+                return [value] if value in valid_types else None
+            elif isinstance(value, list):
+                if all(t in valid_types for t in value):
+                    return value
+                else:
+                    logger.error(f"Invalid text_type values: {value}")
+                    return None
+            else:
+                logger.error(f"Invalid text_type filter format: {value}")
+                return None
+        
+        # 其他字段的原有逻辑
         if isinstance(value, str):
             # Single value - convert to list
             return [value]
@@ -298,7 +314,10 @@ class FilterParser:
         if item_value is None:
             return False
             
-        if field == "categories":
+        if field == "text_type":
+            # text_type过滤：检查item的text_type是否在允许的类型列表中
+            return item_value in value
+        elif field == "categories":
             return any(cat in item_value for cat in value)
         elif field == "authors":
             return any(author.lower() in str(item_value).lower() for author in value)
@@ -333,7 +352,10 @@ class FilterParser:
         if item_value is None:
             return False
             
-        if field == "categories":
+        if field == "text_type":
+            # text_type过滤：检查item的text_type是否在排除的类型列表中
+            return item_value in value
+        elif field == "categories":
             return any(cat in item_value for cat in value)
         elif field == "authors":
             return any(author.lower() in str(item_value).lower() for author in value)
