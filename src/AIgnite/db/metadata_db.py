@@ -444,24 +444,29 @@ class MetadataDB:
             doc_id: Document ID
             
         Returns:
-            True if successful, False otherwise
+            paper_metadata_deleted(True/False),text_chunks_deleted(True/False)
         """
         session = self.Session()
+        text_chunks_deleted = False
+        paper_metadata_deleted = False
         try:
             # Delete text chunks first (due to foreign key constraint)
             text_chunks_deleted = session.query(TextChunkRecord)\
                 .filter_by(doc_id=doc_id)\
                 .delete()
+            if text_chunks_deleted > 0:
+                text_chunks_deleted = True
             logger.debug(f"Deleted {text_chunks_deleted} text chunks for doc_id {doc_id}")
             
             # Delete the paper
             paper = session.query(TableSchema).filter_by(doc_id=doc_id).first()
-            if not paper:
-                return False
+            if paper:
+                paper_metadata_deleted = True
             
             session.delete(paper)
             session.commit()
-            return True
+            return paper_metadata_deleted,text_chunks_deleted
+
         except Exception as e:
             session.rollback()
             logging.error(f"Failed to delete paper {doc_id}: {str(e)}")
@@ -652,7 +657,7 @@ class MetadataDB:
         finally:
             session.close()
 
-    def search_papers(
+    def search(
         self,
         query: str,
         filters: Optional[Dict[str, Any]] = None,

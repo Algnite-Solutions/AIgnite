@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from .base_indexer import BaseIndexer
 from ..data.docset import DocSet
 from ..db.vector_db import VectorDB
@@ -6,6 +6,8 @@ from ..db.metadata_db import MetadataDB
 from ..db.image_db import MinioImageDB
 from .search_strategy import SearchStrategy, VectorSearchStrategy, TFIDFSearchStrategy, HybridSearchStrategy, SearchResult
 from .filter_parser import FilterParser
+from .data_retriever import DataRetriever
+from .result_combiner import ResultCombiner
 import logging
 from tqdm import tqdm
 import os
@@ -35,6 +37,10 @@ class PaperIndexer(BaseIndexer):
         self.image_db = image_db
         self.search_strategy = None
         self.filter_parser = FilterParser()
+        
+        # 初始化数据获取器和结果合并器
+        self.data_retriever = DataRetriever(metadata_db, image_db)
+        self.result_combiner = ResultCombiner()
 
     def __del__(self):
         """Cleanup method."""
@@ -69,16 +75,45 @@ class PaperIndexer(BaseIndexer):
         if image_db is not None:
             self.image_db = image_db
             logger.debug("Image database set")
+        
+        # 更新数据获取器
+        self.data_retriever = DataRetriever(metadata_db, image_db)
 
-    def set_search_strategy(self, strategy_type: str) -> None:
+    def set_search_strategy(self, search_strategies: List[Tuple[SearchStrategy, float]]) -> None:
         """Set the search strategy to use.
         
         Args:
-            strategy_type: One of 'vector', 'tf-idf', or 'hybrid'
+            search_strategies: List of search strategies and their thresholds
             
         Raises:
             ValueError: If strategy_type is invalid or required database is not available
         """
+        if len(search_strategies) == 1:
+            if search_strategies[0][0] == 'vector':
+                if self.vector_db is None:
+                    raise ValueError("Vector database is required for vector search strategy")
+                self.search_strategy = VectorSearchStrategy([(self.vector_db, search_strategies[0][1])])
+            elif search_strategies[0][0] == 'tf-idf':
+                if self.metadata_db is None:
+                    raise ValueError("Metadata database is required for TF-IDF search strategy")
+                self.search_strategy = TFIDFSearchStrategy([(self.metadata_db, search_strategies[0][1])])
+            else:
+                raise ValueError(f"Invalid strategy type. Must be one of: vector, tf-idf")
+            logger.debug(f"Search strategy set to: {search_strategies[0]}")
+        else:
+            if self.vector_db is None or self.metadata_db is None:
+                raise ValueError("Both vector and metadata databases are required for hybrid search strategy")
+            db_search_strategies = []
+            for strategy, threshold in search_strategies:
+                if strategy == 'vector':
+                    db_search_strategies.append((VectorSearchStrategy([(self.vector_db, threshold)]), threshold))
+                elif strategy == 'tf-idf':
+                    db_search_strategies.append((TFIDFSearchStrategy([(self.metadata_db, threshold)]), threshold))
+            self.search_strategy = HybridSearchStrategy(db_search_strategies)
+            #self.search_strategy = HybridSearchStrategy(search_strategies)
+            logger.debug(f"Search strategy set to: hybrid")
+
+        '''
         if strategy_type == 'vector':
             if self.vector_db is None:
                 raise ValueError("Vector database is required for vector search strategy")
@@ -97,8 +132,8 @@ class PaperIndexer(BaseIndexer):
             self.search_strategy = HybridSearchStrategy(vector_strategy, tfidf_strategy)
         else:
             raise ValueError(f"Invalid strategy type. Must be one of: vector, tf-idf, hybrid")
-            
-        logger.debug(f"Search strategy set to: {strategy_type}")
+        '''
+       
 
     def index_papers(self, papers: List[DocSet]) -> Dict[str, Dict[str, bool]]:
         """Index a list of papers into available databases.
@@ -151,12 +186,11 @@ class PaperIndexer(BaseIndexer):
                 # Store vectors if database is available
                 if self.vector_db is not None:
                     try:
-                        text_chunks = [chunk.text for chunk in paper.text_chunks]
+                        #text_chunks = [chunk.text for chunk in paper.text_chunks]
                         success = self.vector_db.add_document(
-                            doc_id=paper.doc_id,
-                            abstract=paper.abstract,
-                            text_chunks=text_chunks,
-                            metadata=metadata
+                            vector_db_id=paper.doc_id+'_abstract',
+                            text_to_emb=paper.title+' . '+paper.abstract,
+                            doc_metadata={"doc_id": paper.doc_id, "text_type": "abstract"}
                         )
                         paper_status["vectors"] = success
                         logger.debug(f"Added vectors for {paper.doc_id}: {success}")
@@ -198,8 +232,8 @@ class PaperIndexer(BaseIndexer):
         query: str, 
         top_k: int = 5, 
         filters: Optional[Dict[str, Any]] = None,
-        similarity_cutoff: float = 0.5,
-        strategy_type: Optional[str] = None
+        search_strategies: List[Tuple[SearchStrategy, float]] = None,
+        result_include_types: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
         """Find papers similar to the query using the selected search strategy.
         
@@ -207,11 +241,12 @@ class PaperIndexer(BaseIndexer):
             query: Search query string
             top_k: Number of results to return
             filters: Optional filters to apply to the search
-            similarity_cutoff: Minimum similarity score to include in results
-            strategy_type: Optional strategy to use for this search ('vector', 'tf-idf', 'hybrid')
+            search_strategies: List of search strategies and their thresholds
+            result_include_types: Optional list of data types to include in results
             
         Returns:
-            List of dictionaries containing paper information and similarity scores
+            combine_results: The combined results according to the include_types and search results
+            search_results: The original search results
             
         Raises:
             ValueError: If no search strategy is available or required database is missing
@@ -219,77 +254,72 @@ class PaperIndexer(BaseIndexer):
         try:
             logger.debug(f"Searching for query: {query}")
             
-            # Ensure we have required databases for the strategy
-            if strategy_type == 'vector' and self.vector_db is None:
-                raise ValueError("Vector database is required for vector search")
-            elif strategy_type == 'tf-idf' and self.metadata_db is None:
-                raise ValueError("Metadata database is required for TF-IDF search")
-            elif strategy_type == 'hybrid' and (self.vector_db is None or self.metadata_db is None):
-                raise ValueError("Both vector and metadata databases are required for hybrid search")
+            # 1. 执行搜索
+            search_results = self._execute_search(query, top_k, filters, search_strategies)
             
-            # Default to vector search if available, otherwise TF-IDF
-            if self.search_strategy is None and strategy_type is None:
-                if self.vector_db is not None:
-                    strategy_type = 'vector'
-                elif self.metadata_db is not None:
-                    strategy_type = 'tf-idf'
-                else:
-                    raise ValueError("No search strategy available - requires either vector or metadata database")
+            if not search_results:
+                logger.debug("No search results found")
+                return []
             
-            # Set or temporarily change strategy
-            original_strategy = self.search_strategy
-            if strategy_type:
-                self.set_search_strategy(strategy_type)
+            # 2. 获取doc_ids
+            doc_ids = [result.doc_id for result in search_results]
+            logger.debug(f"Found {len(doc_ids)} documents: {doc_ids}")
             
-            # Parse and validate filters
-            parsed_filters = self.filter_parser.parse_filters(filters)
+            # 3. 获取数据
+            data_dict = {}
+            for data_type in result_include_types or ["metadata"]:
+                if data_type != "search_parameters":
+                    data_dict[data_type] = self.data_retriever.get_data_by_type(doc_ids, data_type)
             
-            # Perform search
-            search_results = self.search_strategy.search(
-                query=query,
-                top_k=top_k,
-                filters=parsed_filters,
-                similarity_cutoff=similarity_cutoff
-            )
-            #print(111)
-            #print(search_results)
-            # Process results and add full metadata
-            processed_results = []
-            for result in search_results:
-                if self.metadata_db is not None:
-                    metadata = self.metadata_db.get_metadata(result.doc_id)
-                    if metadata:
-                        paper_info = metadata.copy()
-                        paper_info["similarity_score"] = result.score
-                        paper_info["matched_text"] = result.matched_text
-                        paper_info["search_method"] = result.search_method
-                        if result.chunk_id:
-                            paper_info["chunk_id"] = result.chunk_id
-                        
-                        processed_results.append(paper_info)
-                        logger.debug(f"Added result: {paper_info['title']} (score: {result.score})")
-                    else:
-                        logger.warning(f"No metadata found for doc_id: {result.doc_id}")
-                else:
-                    # If no metadata db, return basic result info
-                    processed_results.append({
-                        "doc_id": result.doc_id,
-                        "similarity_score": result.score,
-                        "matched_text": result.matched_text,
-                        "search_method": result.search_method,
-                        "chunk_id": result.chunk_id
-                    })
-            
-            # Restore original strategy if temporarily changed
-            if strategy_type and original_strategy is not None:
-                self.search_strategy = original_strategy
-                
-            logger.debug(f"Returning {len(processed_results)} results")
-            return processed_results
+            # 4. 合并结果
+            combine_results= self.result_combiner.combine(search_results, data_dict, result_include_types or ["metadata"])
+            return combine_results
             
         except Exception as e:
             logger.error(f"Failed to find similar papers: {str(e)}")
             raise RuntimeError(f"Failed to find similar papers: {str(e)}")
+    
+    def _execute_search(self, query: str, top_k: int, filters: Optional[Dict[str, Any]], 
+                       search_strategies: List[Tuple[SearchStrategy, float]]) -> List[SearchResult]:
+        """执行搜索操作
+        
+        Args:
+            query: 搜索查询
+            top_k: 返回结果数量
+            filters: 过滤条件
+            similarity_cutoff: 相似度阈值
+            strategy_type: 搜索策略类型
+            
+        Returns:
+            搜索结果列表
+        """
+        # 确保有可用的数据库
+        if search_strategies is None or len(search_strategies) == 0:
+            raise ValueError("No search strategies provided")
+        
+        if search_strategies[0][0] == 'vector' and self.vector_db is None:
+            raise ValueError("Vector database is required for vector search")
+        elif search_strategies[0][0] == 'tf-idf' and self.metadata_db is None:
+            raise ValueError("Metadata database is required for TF-IDF search")
+        elif search_strategies[0][0] == 'hybrid' and (self.vector_db is None or self.metadata_db is None):
+            raise ValueError("Both vector and metadata databases are required for hybrid search")
+        
+        # 设置或临时更改策略
+        self.set_search_strategy(search_strategies) 
+        try:
+            # 解析和验证过滤器
+            #parsed_filters = self.filter_parser.parse_filters(filters)
+            # 执行搜索
+            search_results = self.search_strategy.search(
+                query=query,
+                top_k=top_k,
+                filters=filters
+            )
+            return search_results
+            
+        except Exception as e:
+            logger.error(f"Failed to execute search: {str(e)}")
+            raise RuntimeError(f"Failed to execute search: {str(e)}")
 
     def get_paper_metadata(self, doc_id: str) -> Optional[dict]:
         """Retrieve metadata for a specific paper.
@@ -318,10 +348,10 @@ class PaperIndexer(BaseIndexer):
             Dictionary indicating deletion status for each database type
         """
         deletion_status = {
-            "metadata": False,
-            "text_chunks": False,   # 文本块存储状态（新增）
-            "vectors": False,
-            "images": False
+            "metadata": True,
+            "text_chunks": True,   # 文本块存储状态（新增）
+            "vectors": True,
+            "images": True
         }
         
         try:
@@ -354,14 +384,16 @@ class PaperIndexer(BaseIndexer):
             if self.metadata_db is not None:
                 try:
                     success = self.metadata_db.delete_paper(doc_id)
-                    deletion_status["metadata"] = success
+                    deletion_status["metadata"] = success[0]
+                    deletion_status["text_chunks"] = success[1]
                     logger.debug(f"Deleted from metadata DB: {success}")
                 except Exception as e:
                     logger.error(f"Failed to delete from metadata DB: {str(e)}")
                 
         except Exception as e:
             logger.error(f"Failed to delete paper {doc_id}: {str(e)}")
-            
+        
+        print('Deletion status:', deletion_status)
         return deletion_status
 
 '''

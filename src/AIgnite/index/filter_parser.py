@@ -86,10 +86,14 @@ class FilterParser:
                 validated_value = self._validate_list_filter(value, field)
             else:
                 logger.warning(f"Unknown field type for {field}")
+                raise ValueError(f"Unknown field type for {field}")
                 continue
                 
             if validated_value is not None:
                 validated_filters[field] = validated_value
+            else:
+                logger.warning(f"Unknown value type for {value}")
+                continue
                 
         return validated_filters
     
@@ -141,16 +145,25 @@ class FilterParser:
             # 验证text_type值是否有效
             valid_types = {'abstract', 'chunk', 'combined'}
             if isinstance(value, str):
-                return [value] if value in valid_types else None
+                if value in valid_types:
+                    return [value]
+                else:
+                    raise ValueError(f"Invalid text_type value: {value}")
             elif isinstance(value, list):
                 if all(t in valid_types for t in value):
                     return value
                 else:
-                    logger.error(f"Invalid text_type values: {value}")
-                    return None
+                    raise ValueError(f"Invalid text_type values: {value}")
+            #    else:
+            #        logger.error(f"Invalid text_type values: {value}")
+            #        raise ValueError(f"Invalid text_type values: {value}")
+            #        
+            #        raise ValueError(f"Invalid text_type values: {value}")
+            #        return None
             else:
-                logger.error(f"Invalid text_type filter format: {value}")
-                return None
+                #logger.error(f"Invalid text_type filter format: {value}")
+                raise ValueError(f"Invalid text_type filter format: {value}")
+                #return None
         
         # 其他字段的原有逻辑
         if isinstance(value, str):
@@ -161,8 +174,9 @@ class FilterParser:
             if all(isinstance(item, str) for item in value):
                 return value
             else:
-                logger.error(f"All values in {field} filter must be strings")
-                return None
+                raise ValueError(f"Invalid {field} filter format: {value}")
+                #logger.error(f"All values in {field} filter must be strings")
+                #return None
         else:
             logger.error(f"Invalid {field} filter format: {value}")
             return None
