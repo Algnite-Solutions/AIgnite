@@ -11,12 +11,52 @@ from tqdm import tqdm
 
 class BaseGenerator(ABC):
     """
-    Abstract base class for blog generators.
+    Abstract base class for LLM generators.
     """
     @abstractmethod
-    def generate_digest(self):
+    def generate_response(self):
         pass
 
+
+class GeminiGenerator(BaseGenerator):
+    """
+    A simple Gemini generator that takes a text prompt and returns text output.
+    """
+    def __init__(self, model_name="gemini-2.5-flash"):
+        self.client = genai.Client(api_key="AIzaSyDQS4jFfedzDourgwQxiP4hhOR0lK67l44")
+        self.model_name = model_name
+
+    def generate_response(self, prompt: str, pdf_path: str = None) -> str:
+        """
+        Generate a text response from a text prompt, optionally with PDF input.
+        
+        Args:
+            prompt (str): The input text prompt
+            pdf_path (str, optional): Path to PDF file to include in the request
+            
+        Returns:
+            str: The generated text response
+        """
+        contents = []
+        
+        if pdf_path:
+            with open(pdf_path, "rb") as pdf_file:
+                pdf_data = pdf_file.read()
+            contents.append(
+                types.Part.from_bytes(
+                    data=pdf_data,
+                    mime_type='application/pdf',
+                )
+            )
+        
+        contents.append(prompt)
+        
+        response = self.client.models.generate_content(
+            model=self.model_name,
+            contents=contents
+        )
+        
+        return response.text
 
 class GeminiBlogGenerator(BaseGenerator):
     """
@@ -30,7 +70,7 @@ class GeminiBlogGenerator(BaseGenerator):
         self.data_path = data_path
         self.output_path = output_path
 
-    def generate_digest(self, papers: List[DocSet]):
+    def generate_response(self, papers: List[DocSet]):
         for paper in papers:
             self._generate_single_blog(paper)
 
