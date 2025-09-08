@@ -1,0 +1,80 @@
+
+
+# Blog Comparison and Evaluation Task
+
+## Task Overview
+Given the pdf document, you will compare and evaluate two blog posts (Blog A and Blog B) that both summarize it. Your goal is to determine which blog better represents the original research across three key dimensions: helpfulness, comprehensiveness, and factual grounding.
+
+## Input Materials
+<blog_a_text>{{blog_a_text}}</blog_a_text>
+<blog_b_text>{{blog_b_text}}</blog_b_text>
+
+## Evaluation Dimensions
+
+### 1. HELPFULNESS
+Determine which blog is more helpful for readers trying to understand the research paper.
+
+<helpfulness_criteria>
+- **Clarity & Accessibility**: Which blog explains complex concepts more clearly?
+- **Practical Value**: Which blog better explains why the research matters?
+- **Educational Value**: Which blog teaches concepts more effectively?
+- **Reader Engagement**: Which blog is more engaging and easier to follow?
+</helpfulness_criteria>
+
+### 2. COMPREHENSIVENESS
+Determine which blog provides more comprehensive coverage of the original research paper.
+
+<comprehensiveness_criteria>
+- **Key Research Elements**: Which blog better covers research questions, methodology, findings, and conclusions?
+- **Important Details**: Which blog includes more essential technical details and context?
+- **Completeness**: Which blog represents the paper more completely?
+- **Balance**: Which blog better prioritizes important vs. peripheral information?
+</comprehensiveness_criteria>
+
+<comprehensiveness_indicators>
+- Coverage of methodology and approach
+- Inclusion of key findings and results
+- Discussion of limitations and implications
+- Appropriate level of detail for blog format
+- Balance between sections
+</comprehensiveness_indicators>
+
+### 3. FACTUAL GROUNDING
+Determine which blog is more factually accurate and better grounded in the original paper.
+
+<factual_grounding_criteria>
+- **Factual Accuracy**: Which blog has fewer factual errors or misstatements?
+- **Faithful Representation**: Which blog more faithfully represents the authors' findings and conclusions?
+- **No Hallucination**: Which blog avoids unsupported claims or exaggerations?
+- **Appropriate Uncertainty**: Which blog better communicates the certainty/uncertainty of findings?
+</factual_grounding_criteria>
+
+<critical_issues>
+- Factual errors or misstatements
+- Claims not supported by the paper
+- Misrepresentation of limitations
+- Overgeneralization of findings
+- Incorrect data or statistics
+</critical_issues>
+
+## Evaluation Scale
+For each dimension, use this comparison scale:
+- **Blog A significantly better**: Clear advantage in multiple areas
+- **Blog A slightly better**: Minor advantage overall
+- **TIE**: Both blogs are roughly equal
+- **Blog B slightly better**: Minor advantage overall
+- **Blog B significantly better**: Clear advantage in multiple areas
+
+## Instructions
+1. First, carefully read the original research paper to understand its content, methodology, findings, and conclusions.
+2. Read both Blog A and Blog B completely.
+3. For each dimension (helpfulness, comprehensiveness, factual grounding):
+   - Compare the blogs using the specific criteria provided
+   - Identify concrete examples that support your evaluation
+   - Determine a winner with a confidence level and margin
+   - Provide detailed reasoning for your decision
+4. Format your evaluation for each dimension according to the output format below
+
+## Output Format
+Provide your evaluation for each dimension in the following JSON format:
+
