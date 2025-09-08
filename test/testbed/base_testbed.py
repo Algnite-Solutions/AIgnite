@@ -18,7 +18,7 @@ import sys
 import os
 
 # 添加PaperIgnition路径
-from AIgnite.config.config_loader import load_config
+from test.index.config.config_loader import load_config
 
 
 class TestBed(ABC):

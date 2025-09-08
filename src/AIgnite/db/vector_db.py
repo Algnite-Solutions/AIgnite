@@ -29,8 +29,8 @@ class VectorEntry:
 
 class BGEEmbeddings(Embeddings):
     """BGE embedding model wrapper for LangChain compatibility."""
-    
-    def __init__(self, model_name: str = 'BAAI/bge-base-en-v1.5'):
+    '''
+    def __init__(self, model_name: str = 'BAAI/bge-base-en-v1.5',local_model_path: str = None):
         """Initialize BGE embeddings.
         
         Args:
@@ -39,7 +39,7 @@ class BGEEmbeddings(Embeddings):
         self.model_name = model_name
         
         # Initialize embedding model
-        local_model_path = '~/.cache/huggingface/hub/models--BAAI--bge-base-en-v1.5/snapshots/a5beb1e3e68b9ab74eb54cfd186867f64f240e1a/'
+        #local_model_path = '~/.cache/huggingface/hub/models--BAAI--bge-base-en-v1.5/snapshots/a5beb1e3e68b9ab74eb54cfd186867f64f240e1a/'
         local_model_path = os.path.expanduser(local_model_path)
         if not os.path.exists(local_model_path):
             print(f"Downloading model to {local_model_path}")
@@ -47,7 +47,16 @@ class BGEEmbeddings(Embeddings):
         else:
             print(f"Found existing model at {local_model_path}")
         self.model = FlagModel(local_model_path)
-    
+    '''
+    def __init__(self, model_name: str = 'BAAI/bge-base-en-v1.5'):
+        """Initialize BGE embeddings.
+        
+        Args:
+            model_name: Name of the BGE model to use
+        """
+        self.model_name = model_name
+        self.model = FlagModel(model_name)
+        
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         """Embed a list of documents.
         
