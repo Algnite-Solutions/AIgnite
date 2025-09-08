@@ -1,4 +1,4 @@
-# Index Paper 数据存储逻辑详解
+# PaperIndexer 数据存储逻辑详解
 
 ## 概述
 
@@ -7,24 +7,36 @@
 ## 系统架构
 
 ```
-PaperIndexer.index_papers()
+数据储存架构
 ├── 数据准备阶段
 │   └── 构建metadata对象
 ├── 并行存储阶段
-│   ├── MetadataDB (PostgreSQL) - 元数据存储
+│   ├── MetadataDB (PostgreSQL) - 元数据存储 + 全文内容存储
 │   ├── VectorDB (FAISS) - 向量存储
 │   └── MinioImageDB (MinIO) - 图像存储
 └── 状态跟踪
     └── 返回索引状态报告
+
+数据检索架构（重构后）
+├── 搜索策略模块 (SearchStrategy)
+│   ├── VectorSearchStrategy - 向量搜索（策略组合模式）
+│   ├── TFIDFSearchStrategy - TF-IDF搜索（策略组合模式）
+│   └── HybridSearchStrategy - 混合搜索（倒数排名重排序）
+├── 过滤器模块 (FilterParser)
+│   ├── 字段验证和解析
+│   ├── SQL条件生成
+│   └── 内存过滤应用
+└── 结果合并模块 (CombineStrategy) - 新增
+    ├── DataRetriever - 数据获取接口
+    └── ResultCombiner - 结果合并器
 ```
 
-## 详细存储流程
+## 数据储存架构详解
 
 ### 1. 数据准备阶段
 
 #### 输入数据结构
 ```python
-# 从DocSet对象提取核心信息
 class DocSet:
     doc_id: str                    # 论文唯一标识符
     title: str                     # 论文标题
@@ -42,7 +54,6 @@ class DocSet:
 
 #### Metadata构建
 ```python
-# 构建统一的metadata对象
 metadata = {
     "title": paper.title,                    # 论文标题
     "abstract": paper.abstract,              # 论文摘要
@@ -58,158 +69,98 @@ metadata = {
 
 ### 2. 并行存储阶段
 
-#### 🔄 MetadataDB (PostgreSQL) - 元数据存储
+#### MetadataDB (PostgreSQL) - 元数据存储
 
 **存储条件**
 ```python
 if self.metadata_db is not None and hasattr(paper, 'pdf_path'):
-    success = self.metadata_db.save_paper(paper.doc_id, paper.pdf_path, metadata)
+    success = self.metadata_db.save_paper(paper.doc_id, paper.pdf_path, metadata, paper.text_chunks)
 ```
 
 **存储内容**
-- **结构化数据**：标题、摘要、作者、分类、发布日期
-- **PDF二进制数据**：完整的PDF文件内容
-- **引用关系**：文本块ID、图像块ID、表格块ID
-- **文件路径**：PDF路径、HTML路径
-- **扩展元数据**：其他自定义字段
+- 结构化数据：标题、摘要、作者、分类、发布日期
+- PDF二进制数据：完整的PDF文件内容
+- 文本块内容：完整的文本块内容，使用doc_id+chunk_id作为唯一标识
+- 引用关系：文本块ID、图像块ID、表格块ID
+- 文件路径：PDF路径、HTML路径
 
 **数据库表结构**
 ```sql
+-- 论文元数据表
 CREATE TABLE papers (
     id SERIAL PRIMARY KEY,
-    doc_id VARCHAR UNIQUE NOT NULL,      -- 论文唯一标识符
-    title VARCHAR NOT NULL,              -- 论文标题
-    abstract TEXT,                       -- 论文摘要
-    authors JSON,                        -- 作者列表（JSON格式）
-    categories JSON,                     -- 分类列表（JSON格式）
-    published_date VARCHAR,              -- 发布日期
-    pdf_data BYTEA,                     -- PDF二进制数据
-    chunk_ids JSON,                     -- 文本块ID列表
-    figure_ids JSON,                    -- 图像块ID列表
-    table_ids JSON,                     -- 表格块ID列表
-    extra_metadata JSON,                -- 扩展元数据
-    pdf_path VARCHAR,                   -- PDF文件路径
-    HTML_path VARCHAR,                  -- HTML文件路径
-    blog TEXT,                          -- 博客内容
-    comments TEXT                       -- 论文评论/备注
+    doc_id VARCHAR UNIQUE NOT NULL,
+    title VARCHAR NOT NULL,
+    abstract TEXT,
+    authors JSON,
+    categories JSON,
+    published_date VARCHAR,
+    pdf_data BYTEA,
+    chunk_ids JSON,
+    figure_ids JSON,
+    table_ids JSON,
+    extra_metadata JSON,
+    pdf_path VARCHAR,
+    HTML_path VARCHAR,
+    comments TEXT
 );
 
--- 全文搜索索引
-CREATE INDEX idx_fts ON papers 
-USING gin(to_tsvector('english', coalesce(title, '') || ' ' || coalesce(abstract, '')));
+-- 文本块内容表
+CREATE TABLE text_chunks (
+    id VARCHAR PRIMARY KEY,
+    doc_id VARCHAR NOT NULL,
+    chunk_id VARCHAR NOT NULL,
+    text_content TEXT NOT NULL,
+    chunk_order INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (doc_id) REFERENCES papers(doc_id) ON DELETE CASCADE
+);
 ```
 
-**存储流程**
-```python
-def save_paper(self, doc_id: str, pdf_path: str, metadata: Dict[str, Any]) -> bool:
-    # 1. 验证必需字段
-    required_fields = ['title', 'abstract', 'authors', 'categories', 'published_date']
-    
-    # 2. 检查是否已存在
-    if session.query(TableSchema).filter_by(doc_id=doc_id).first():
-        return False  # 已存在，跳过
-    
-    # 3. 读取PDF二进制数据
-    with open(pdf_path, 'rb') as pdf_file:
-        pdf_data = pdf_file.read()
-    
-    # 4. 创建数据库记录
-    paper = TableSchema(
-        doc_id=doc_id,
-        title=metadata['title'],
-        abstract=metadata['abstract'],
-        authors=metadata['authors'],
-        categories=metadata['categories'],
-        published_date=metadata['published_date'],
-        pdf_data=pdf_data,
-        chunk_ids=metadata.get('chunk_ids', []),
-        figure_ids=metadata.get('figure_ids', []),
-        table_ids=metadata.get('table_ids', []),
-        extra_metadata=metadata.get('metadata', {}),
-        pdf_path=pdf_path,
-        HTML_path=metadata.get('HTML_path'),
-        blog=metadata.get('blog'),
-        comments=metadata.get('comments')  # Store comments field
-    )
-    
-    # 5. 保存到数据库
-    session.add(paper)
-    session.commit()
-    return True
-```
+#### VectorDB (FAISS) - 向量存储
 
-#### 🧠 VectorDB (FAISS) - 向量存储
+VectorDB 使用简化的存储接口，只需要三个参数：`vector_db_id`、`text_to_emb`、`doc_metadata`。`vector_db_id` 是向量数据库中的唯一标识符，用于索引内容（`text_to_emb`）；`doc_metadata` 是用于区分内容的附加信息。例如，文本块可能来自同一文档，它们共享一个 `doc_id` 但各自拥有独立的 `vector_db_id`。
 
 **存储条件**
 ```python
 if self.vector_db is not None:
-    text_chunks = [chunk.text for chunk in paper.text_chunks]
     success = self.vector_db.add_document(
-        doc_id=paper.doc_id,
-        abstract=paper.abstract,
-        text_chunks=text_chunks,
-        metadata=metadata
+        vector_db_id=unique_vector_id,  # 向量数据库中的唯一ID
+        text_to_emb=text_content,       # 要嵌入的文本内容
+        doc_metadata=metadata           # 文档元数据
     )
 ```
 
 **存储内容**
-- **组合向量**：标题 + 分类 + 摘要的组合嵌入
-- **摘要向量**：论文摘要的独立嵌入
-- **文本块向量**：每个文本块的独立嵌入
+- 单一向量存储：根据传入的 `text_to_emb` 参数创建单个向量嵌入
+- 灵活存储策略：支持存储摘要、文本块或任何其他文本内容的向量表示
+- 元数据关联：通过 `doc_metadata` 中的 `doc_id` 和 `text_type` 等信息进行内容分类和检索
 
-**向量生成过程**
+**使用示例**
 ```python
-def add_document(self, doc_id: str, abstract: str, text_chunks: List[str], metadata: Dict[str, Any]) -> bool:
-    # 1. 检查文档是否已存在
-    if any(entry.doc_id == doc_id for entry in self.entries):
-        return False  # 已存在，跳过
-    
-    # 2. 创建组合文本向量
-    title = metadata.get('title', '')
-    categories = ' '.join(metadata.get('categories', []))
-    combined_text = f"{title} {categories} {abstract}"
-    
-    combined_entry = VectorEntry(
-        doc_id=doc_id,
-        text=combined_text,
-        text_type='combined'
-    )
-    combined_entry.vector = self._get_embedding(combined_text)
-    self.entries.append(combined_entry)
-    self.index.add(combined_entry.vector)
-    
-    # 3. 创建摘要向量
-    abstract_entry = VectorEntry(
-        doc_id=doc_id,
-        text=abstract,
-        text_type='abstract'
-    )
-    abstract_entry.vector = self._get_embedding(abstract)
-    self.entries.append(abstract_entry)
-    self.index.add(abstract_entry.vector)
-    
-    # 4. 创建文本块向量
-    chunk_ids = metadata.get('chunk_ids', [])
-    for chunk_text, chunk_id in zip(text_chunks, chunk_ids):
-        chunk_entry = VectorEntry(
-            doc_id=doc_id,
-            text=chunk_text,
-            text_type='chunk',
-            chunk_id=chunk_id
-        )
-        chunk_entry.vector = self._get_embedding(chunk_text)
-        self.entries.append(chunk_entry)
-        self.index.add(chunk_entry.vector)
-    
-    return True
-```
+# 存储论文摘要
+vector_db.add_document(
+    vector_db_id=f"{paper.doc_id}_abstract",
+    text_to_emb=paper.abstract,
+    doc_metadata={"doc_id": paper.doc_id, "text_type": "abstract"}
+)
 
-**技术细节**
-- **嵌入模型**：BAAI/bge-base-en-v1.5
-- **向量维度**：768维
-- **索引类型**：FAISS IndexFlatIP（内积相似度）
-- **向量归一化**：L2归一化确保相似度计算准确性
-- **向量类型**：float32，优化FAISS性能
+# 存储文本块
+for chunk in paper.text_chunks:
+    vector_db.add_document(
+        vector_db_id=f"{paper.doc_id}_chunk_{chunk.id}",
+        text_to_emb=chunk.text,
+        doc_metadata={"doc_id": paper.doc_id, "text_type": "chunk", "chunk_id": chunk.id}
+    )
+
+# 存储组合内容（标题+分类+摘要）
+combined_text = f"{paper.title} {' '.join(paper.categories)} {paper.abstract}"
+vector_db.add_document(
+    vector_db_id=f"{paper.doc_id}_combined",
+    text_to_emb=combined_text,
+    doc_metadata={"doc_id": paper.doc_id, "text_type": "combined"}
+)
+```
 
 **向量条目结构**
 ```python
@@ -222,7 +173,7 @@ class VectorEntry:
     vector: Optional[np.ndarray] = None  # 向量表示
 ```
 
-#### 🖼️ MinioImageDB (MinIO) - 图像存储
+#### MinioImageDB (MinIO) - 图像存储
 
 **存储条件**
 ```python
@@ -236,230 +187,265 @@ if self.image_db is not None and paper.figure_chunks:
 ```
 
 **存储内容**
-- **图像文件**：论文中的图表、图像等视觉内容
-- **对象命名**：`{doc_id}/{image_id}`的层次结构
-- **元数据**：图像ID和文档ID的关联关系
+- 图像文件：论文中的图表、图像等视觉内容
+- 对象命名：`{doc_id}/{image_id}`的层次结构
+- 元数据：图像ID和文档ID的关联关系
 
-**存储结构**
-```
-MinIO Bucket: papers/
-├── doc_id_1/
-│   ├── image_1.png
-│   ├── image_2.jpg
-│   └── figure_3.pdf
-├── doc_id_2/
-│   ├── chart_1.png
-│   └── diagram_2.svg
-```
+### 3. 状态跟踪
 
-**存储流程**
+#### 状态结构
 ```python
-def save_image(self, doc_id: str, image_id: str, image_path: str = None, image_data: bytes = None) -> bool:
-    # 1. 验证输入参数
-    if not image_path and not image_data:
-        raise ValueError("Either image_path or image_data must be provided")
-    
-    # 2. 生成MinIO对象名称
-    object_name = f"{doc_id}/{image_id}"
-    
-    # 3. 处理图像路径
-    if image_path:
-        if not os.path.exists(image_path):
-            raise FileNotFoundError(f"Image file not found: {image_path}")
-        
-        # 上传文件
-        self.client.fput_object(
-            bucket_name=self.bucket_name,
-            object_name=object_name,
-            file_path=image_path
-        )
-    
-    # 4. 处理图像数据
-    else:
-        # 验证图像数据有效性
-        try:
-            Image.open(io.BytesIO(image_data))
-        except:
-            raise ValueError("Invalid image data")
-        
-        # 上传字节数据
-        self.client.put_object(
-            bucket_name=self.bucket_name,
-            object_name=object_name,
-            data=io.BytesIO(image_data),
-            length=len(image_data)
-        )
-    
-    return True
+paper_status = {
+    "metadata": False,      # 元数据存储状态
+    "text_chunks": False,   # 文本块存储状态
+    "vectors": False,       # 向量存储状态
+    "images": False         # 图像存储状态
+}
 ```
 
-### 3. 数据关联关系
+## 数据检索架构详解
 
-#### 主键关联
+数据检索发生在PaperIndexer的find_similar_papers方法中，其基本输入为查询字符串query、结果数量top_k、过滤条件filters、搜索策略列表search_strategies和返回数据类型result_include_types。该方法通过四步流程实现：1)执行搜索获取候选文档，2)提取文档ID，3)根据指定类型获取详细数据，4)合并搜索结果并返回结构化数据。
+
+### PaperIndexer 搜索策略设置
+
+#### set_search_strategy 方法
+```python
+def set_search_strategy(self, search_strategies: List[Tuple[SearchStrategy, float]]) -> None:
+    """Set the search strategy to use.
+    
+    Args:
+        search_strategies: List of search strategies and their thresholds
+        
+    Raises:
+        ValueError: If strategy_type is invalid or required database is not available
+    """
+```
+
+**支持的策略类型**：
+- **单一策略**：`[('vector', 0.5)]` 或 `[('tf-idf', 0.1)]`
+- **混合策略**：`[('vector', 0.5), ('tf-idf', 0.1)]`
+
+**策略设置流程**：
+1. 检查策略数量（单一 vs 混合）
+2. 验证所需数据库的可用性
+3. 创建相应的SearchStrategy实例
+4. 设置内部搜索策略
+
+### 1. 搜索策略模块 (SearchStrategy)
+
+#### 策略组合模式设计
+
+所有搜索策略现在采用统一的策略组合模式：
+- **初始化参数**：`search_strategies: List[Tuple[SearchStrategy, float]]`
+- **策略元组**：每个元素为`(策略实例, 相似度阈值)`的元组
+- **搜索流程**：调用内部策略列表，获取更多候选结果，应用策略特定阈值过滤
+
+#### 设计优势
+- **统一接口**：所有策略使用相同的初始化模式
+- **灵活组合**：支持任意策略的组合和嵌套
+- **阈值控制**：每个策略可以设置独立的相似度阈值
+- **扩展性**：易于添加新的搜索策略类型
+
+#### VectorSearchStrategy - 向量搜索
+
+在向量搜索的SearchStrategy中，可以传入filters，目前支持的key为docids，格式为 "filters={"doc_ids": ["001", "004"]}"
+```python
+class VectorSearchStrategy(SearchStrategy):
+    def __init__(self, search_strategies):
+        """初始化向量搜索策略
+        
+        Args:
+            search_strategies: 搜索策略列表，每个元素为(策略实例, 相似度阈值)的元组
+        """
+        self.search_strategies = search_strategies
+        assert len(self.search_strategies) == 1
+
+    def search(self, query: str, top_k: int, filters: Optional[Dict[str, Any]] = None, 
+               similarity_cutoff: float = 0.5, **kwargs):
+        # 调用内部策略列表进行搜索
+        for strategy, strategy_cutoff in self.search_strategies:
+            strategy_results = strategy.search(query, top_k * 2, filters, strategy_cutoff)
+        # 过滤结果并转换为标准格式
+```
+
+
+在基于关键词的SearchStrategy中，可以传入filters，目前支持的key为：`categories`、`authors`、`published_date`、`doc_ids`、`title_keywords`、`abstract_keywords`、`text_type`，格式为：
+```python
+{
+    "include": {
+        "categories": ["cs.AI", "cs.LG"],           # 分类过滤，支持多个分类
+        "doc_ids": ["doc1", "doc2"],                # 特定文档ID过滤
+        "text_type": ["abstract", "chunk"]          # 文本类型过滤：abstract/chunk/combined
+    },
+    "exclude": {
+        "categories": ["cs.CR"],                    # 排除特定分类
+        "authors": ["Bob Wilson"],                  # 排除特定作者
+        "text_type": ["chunk"]                      # 排除特定文本类型
+    }
+}
+```
+#### TFIDFSearchStrategy - TF-IDF搜索
+```python
+class TFIDFSearchStrategy(SearchStrategy):
+    def __init__(self, search_strategies):
+        """初始化TF-IDF搜索策略
+        
+        Args:
+            search_strategies: 搜索策略列表，每个元素为(策略实例, 相似度阈值)的元组
+        """
+        self.search_strategies = search_strategies
+        assert len(self.search_strategies) == 1
+
+    def search(self, query: str, top_k: int, filters: Optional[Dict[str, Any]] = None, 
+               similarity_cutoff: float = 0.1, **kwargs):
+        # 调用内部策略列表进行搜索
+        for strategy, strategy_cutoff in self.search_strategies:
+            strategy_results = strategy.search(query, top_k * 2, filters, strategy_cutoff)
+```
+
+在基于混合检索的SearchStrategy中，可以传入filters，filters会被传入向量检索和关键词检索中
+
+#### HybridSearchStrategy - 混合搜索
+
+混合搜索策略支持多个搜索策略的组合，通过倒数排名重排序机制优化搜索结果。
+
+**初始化设计**
+```python
+class HybridSearchStrategy(SearchStrategy):
+    def __init__(
+        self,
+        search_strategies: List[Tuple[SearchStrategy, float]]
+    ):
+        """
+        初始化混合搜索策略
+        
+        Args:
+            search_strategies: 搜索策略列表，每个元素为(策略实例, 相似度阈值)的元组
+                            例如: [(vector_strategy, 0.5), (tfidf_strategy, 0.1)]
+        """
+        self.search_strategies = search_strategies
+        assert len(self.search_strategies) > 1
+```
+
+**搜索方法设计**
+```python
+def search(self, query: str, top_k: int, filters: Optional[Dict[str, Any]] = None, 
+           similarity_cutoff: float = 0.5, **kwargs) -> List[SearchResult]:
+    """
+    执行混合搜索
+    
+    Args:
+        query: 搜索查询字符串
+        top_k: 返回结果数量
+        filters: 可选的过滤条件
+        similarity_cutoff: 相似度阈值
+        **kwargs: 额外参数
+        
+    Returns:
+        重排序后的搜索结果列表
+    """
+```
+
+**倒数排名重排序机制**
+1. **多策略搜索**：调用所有子策略获取候选结果
+2. **结果分组**：按文档ID分组，按搜索方法分类
+3. **倒数排名计算**：为每个搜索方法计算倒数排名分数
+4. **分数合并**：将不同方法的分数进行平均合并
+5. **结果重排序**：按合并后的分数排序并返回top_k结果
+
+
+### 2. 过滤器模块 (FilterParser)
+
+#### 支持的过滤字段
+- **基础字段**：doc_ids、categories、authors、published_date
+- **文本内容**：title_keywords、abstract_keywords、text_type
+
+#### 过滤器语法结构
+```python
+filters = {
+    "include": {
+        "categories": ["cs.AI", "cs.CL"],
+        "text_type": ["abstract", "combined"],
+        "authors": ["John Smith"],
+        "published_date": ["2023-01-01", "2024-01-01"]
+    },
+    "exclude": {
+        "text_type": ["chunk"],
+        "doc_ids": ["paper_001", "paper_002"]
+    }
+}
+```
+
+#### 先过滤后搜索架构
+- **MetadataDB**：应用SQL过滤器 → 全文搜索
+- **VectorDB**：内存过滤候选向量 → 向量搜索
+
+### 3. 结果合并模块 (CombineStrategy)
+
+#### DataRetriever - 数据获取接口
+```python
+class DataRetriever:
+    def __init__(self, metadata_db: Optional[MetadataDB] = None, 
+                 image_db: Optional[MinioImageDB] = None):
+        self.metadata_db = metadata_db
+        self.image_db = image_db
+    
+    def get_data_by_type(self, doc_ids: List[str], data_type: str) -> Dict[str, Any]:
+        if data_type == "metadata":
+            return self._get_metadata(doc_ids)
+        elif data_type == "text_chunks":
+            return self._get_text_chunks(doc_ids)
+        elif data_type == "images":
+            return self._get_images(doc_ids)
+        elif data_type == "full_text":
+            return self._get_full_text(doc_ids)
+```
+
+#### ResultCombiner - 结果合并器
+```python
+class ResultCombiner:
+    def combine(self, search_results: List[SearchResult], 
+                data_dict: Dict[str, Dict[str, Any]], 
+                include_types: List[str]) -> List[Dict[str, Any]]:
+        results = []
+        for result in search_results:
+            combined = {"doc_id": result.doc_id}
+            # 添加搜索参数和其他数据类型
+            # ...
+        return results
+```
+
+#### 数据获取流程
+1. **搜索执行**：通过SearchStrategy获取候选文档列表
+2. **文档ID提取**：从搜索结果中提取doc_ids
+3. **数据获取**：根据result_include_types调用DataRetriever获取相应数据
+4. **结果合并**：使用ResultCombiner将搜索结果与获取的数据合并
+
+#### 支持的数据类型
+```python
+SUPPORTED_INCLUDE_TYPES = {
+    "metadata",           # 论文元数据
+    "search_parameters",  # 搜索参数
+    "text_chunks",        # 文本块内容
+    "full_text",          # 完整文本
+    "images"              # 图像数据
+}
+```
+
+## 数据关联关系
+
+### 主键关联
 - **doc_id**：所有三个数据库的主关联键
-- **chunk_id**：文本块在向量数据库中的唯一标识
+- **doc_id + chunk_id**：文本块在全文存储表中的唯一标识
+- **vector_db_id**：向量在FAISS数据库中的唯一标识（替代原来的chunk_id）
 - **image_id**：图像在MinIO中的唯一标识
 
-#### 引用关系
+### 引用关系
 ```python
-# MetadataDB中存储的引用关系
 metadata = {
     "chunk_ids": ["chunk_001", "chunk_002", "chunk_003"],
     "figure_ids": ["fig_001", "fig_002"],
     "table_ids": ["table_001"]
 }
 ```
-
-#### 数据完整性
-- **MetadataDB**：存储完整的论文信息和引用关系
-- **VectorDB**：存储可搜索的向量表示
-- **MinioImageDB**：存储视觉内容
-
-### 4. 存储优化特性
-
-#### 并行处理
-- 三个数据库可以并行写入，提高索引效率
-- 每个数据库独立处理，互不阻塞
-
-#### 批量操作
-- 支持批量索引多个论文
-- 向量数据库批量添加后统一保存
-
-#### 错误处理
-- 单个数据库失败不影响其他数据库
-- 详细的成功/失败状态报告
-
-#### 重复检查
-- 所有数据库都检查文档是否已存在
-- 避免重复索引相同论文
-
-### 5. 存储状态跟踪
-
-#### 状态结构
-```python
-# 每个论文的索引状态
-paper_status = {
-    "metadata": False,  # 元数据存储状态
-    "vectors": False,   # 向量存储状态
-    "images": False     # 图像存储状态
-}
-
-# 返回所有论文的索引状态
-indexing_status = {
-    "paper_001": {"metadata": True, "vectors": True, "images": False},
-    "paper_002": {"metadata": True, "vectors": False, "images": True}
-}
-```
-
-#### 状态检查逻辑
-```python
-# 检查每个数据库的可用性
-if self.metadata_db is not None and hasattr(paper, 'pdf_path'):
-    # 尝试存储元数据
-    try:
-        success = self.metadata_db.save_paper(paper.doc_id, paper.pdf_path, metadata)
-        paper_status["metadata"] = success
-    except Exception as e:
-        logger.error(f"Failed to store metadata for {paper.doc_id}: {str(e)}")
-
-if self.vector_db is not None:
-    # 尝试存储向量
-    try:
-        success = self.vector_db.add_document(...)
-        paper_status["vectors"] = success
-        if success:
-            save_success = self.vector_db.save()
-            if not save_success:
-                paper_status["vectors"] = False
-    except Exception as e:
-        logger.error(f"Failed to store vectors for {paper.doc_id}: {str(e)}")
-
-if self.image_db is not None and paper.figure_chunks:
-    # 尝试存储图像
-    try:
-        image_successes = []
-        for figure in paper.figure_chunks:
-            success = self.image_db.save_image(...)
-            image_successes.append(success)
-        paper_status["images"] = all(image_successes)
-    except Exception as e:
-        logger.error(f"Failed to store images for {paper.doc_id}: {str(e)}")
-```
-
-## 数据检索流程
-
-### 1. 向量搜索
-- 查询文本 → 向量嵌入 → FAISS相似度搜索 → 返回候选文档
-
-### 2. 元数据增强
-- 从VectorDB获取相似度分数
-- 从MetadataDB获取完整论文信息
-- 合并结果并排序
-
-### 3. 图像访问
-- 通过doc_id和image_id从MinIO获取图像
-- 支持直接下载或保存到本地
-
-## 性能特性
-
-### 存储性能
-- **并行写入**：三个数据库同时处理，最大化I/O效率
-- **批量操作**：减少数据库连接开销
-- **内存优化**：向量数据库使用内存索引，快速响应
-
-### 查询性能
-- **索引优化**：PostgreSQL全文搜索索引
-- **向量缓存**：FAISS索引常驻内存
-- **分层存储**：不同类型数据使用最适合的存储方式
-
-### 扩展性
-- **水平扩展**：MinIO支持分布式存储
-- **垂直扩展**：PostgreSQL支持读写分离
-- **缓存层**：可添加Redis等缓存系统
-
-## 错误处理策略
-
-### 数据库级别错误
-- **连接失败**：记录错误日志，跳过该数据库
-- **存储失败**：回滚事务，标记状态为失败
-- **数据损坏**：自动清理，重新索引
-
-### 应用级别错误
-- **文件不存在**：跳过该论文，记录警告
-- **格式错误**：验证数据格式，过滤无效数据
-- **内存不足**：分批处理，控制内存使用
-
-### 恢复机制
-- **部分失败**：继续处理其他论文
-- **状态报告**：详细记录每个操作的结果
-- **重试机制**：支持手动重试失败的索引操作
-
-## 维护和监控
-
-### 定期维护
-- **数据备份**：定期备份所有数据库
-- **索引重建**：向量数据库损坏时的恢复流程
-- **性能监控**：搜索响应时间和索引速度
-
-### 监控指标
-- **存储状态**：每个数据库的可用性
-- **索引速度**：论文/分钟的处理速度
-- **存储空间**：各数据库的磁盘使用情况
-- **查询性能**：搜索响应时间和准确率
-
-### 故障恢复
-- **自动检测**：监控数据库连接状态
-- **优雅降级**：部分数据库不可用时的处理策略
-- **数据同步**：确保各数据库数据一致性
-
-## 总结
-
-AIgnite Index System的index paper过程采用了**数据分离存储**和**统一检索接口**的架构设计：
-
-1. **数据分离**：不同类型的数据存储到最适合的数据库中
-2. **并行处理**：三个数据库同时工作，最大化性能
-3. **统一接口**：通过doc_id关联，提供一致的检索体验
-4. **容错设计**：单个数据库失败不影响整体功能
-5. **状态跟踪**：完整的操作状态反馈，便于监控和调试
-
-这种设计既保证了存储效率，又提供了灵活的搜索能力，形成了一个完整的论文索引和检索系统。 
