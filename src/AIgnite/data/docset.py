@@ -26,6 +26,7 @@ class FigureChunk(BaseChunk):
     type: Literal[ChunkType.FIGURE]
     image_path: str | None  # e.g. local path, S3 url
     alt_text: Optional[str] = None
+    image_data: Optional[bytes] = None
 
 
 class TableChunk(BaseChunk):

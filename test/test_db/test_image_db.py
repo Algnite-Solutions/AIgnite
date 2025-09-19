@@ -14,13 +14,16 @@ class TestMinioImageDB(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up test MinIO connection and test data"""
+        print("✅ Initializing test MinIO image database...")
+        
         # MinIO test server configuration
-        cls.endpoint = "localhost:9000"
-        cls.access_key = "Wc58W6KOCOfxaAc2MjzM"  # Default MinIO access key
-        cls.secret_key = "Seqa7Xs3TO6EaClfD4l6y4b4teW7t2Y1Slu92VKw"  # Default MinIO secret key
-        cls.bucket_name = "aignite-test-images"
+        cls.endpoint = "localhost:9081"
+        cls.access_key = "XOrv2wfoWfPypp2zGIae"  # Default MinIO access key
+        cls.secret_key = "k9agaJuX2ZidOtaBxdc9Q2Hz5GnNKncNBnEZIoK3"  # Default MinIO secret key
+        cls.bucket_name = "aignite-test-paper-test"
         
         # Initialize MinIO client
+        print(f"✅ Connecting to MinIO server at {cls.endpoint}...")
         cls.minio_db = MinioImageDB(
             endpoint=cls.endpoint,
             access_key=cls.access_key,
@@ -30,12 +33,14 @@ class TestMinioImageDB(unittest.TestCase):
         )
         
         # Create temporary directory for test files
+        print("✅ Creating temporary test files...")
         cls.temp_dir = tempfile.mkdtemp()
         
         # Create test images
         cls.test_doc_id = "2106.14834"
         cls.test_images = {}
         
+        print(f"✅ Generating {3} test images...")
         # Create multiple test images with different sizes and content
         for i in range(3):
             image_id = f"{cls.test_doc_id}_img_{i}"
@@ -46,148 +51,150 @@ class TestMinioImageDB(unittest.TestCase):
             img.save(image_path)
             
             cls.test_images[image_id] = image_path
+        
+        print("✅ Test setup completed successfully!")
 
     def setUp(self):
         """Clean up any existing test images before each test"""
-        self.minio_db.delete_doc_images(self.test_doc_id)
+        # Clean up test images by deleting them individually
+        for image_id in self.test_images.keys():
+            try:
+                self.minio_db.delete_image(image_id)
+            except:
+                pass  # Ignore errors during cleanup
 
     def test_save_image(self):
         """Test saving a single image"""
+        print("🧪 Running test: save_image")
         image_id = f"{self.test_doc_id}_img_0"
         image_path = self.test_images[image_id]
         
         # Save image
         result = self.minio_db.save_image(
-            doc_id=self.test_doc_id,
-            image_id=image_id,
+            object_name=image_id,
             image_path=image_path
         )
         self.assertTrue(result)
         
-        # Verify image was saved by listing images
-        saved_images = self.minio_db.list_doc_images(self.test_doc_id)
-        self.assertIn(image_id, saved_images)
+        # Verify image was saved by retrieving it
+        image_data = self.minio_db.get_image(image_id)
+        self.assertIsNotNone(image_data)
+        print("✅ test_save_image passed!")
 
     def test_save_multiple_images(self):
-        """Test saving multiple images for the same document"""
+        """Test saving multiple images"""
+        print("🧪 Running test: save_multiple_images")
         # Save all test images
         for image_id, image_path in self.test_images.items():
             result = self.minio_db.save_image(
-                doc_id=self.test_doc_id,
-                image_id=image_id,
+                object_name=image_id,
                 image_path=image_path
             )
             self.assertTrue(result)
         
-        # Verify all images were saved
-        saved_images = self.minio_db.list_doc_images(self.test_doc_id)
-        self.assertEqual(len(saved_images), len(self.test_images))
+        # Verify all images were saved by retrieving them
         for image_id in self.test_images.keys():
-            self.assertIn(image_id, saved_images)
+            image_data = self.minio_db.get_image(image_id)
+            self.assertIsNotNone(image_data)
+        print("✅ test_save_multiple_images passed!")
 
     def test_get_image_as_bytes(self):
         """Test retrieving image as bytes"""
+        print("🧪 Running test: get_image_as_bytes")
         image_id = f"{self.test_doc_id}_img_0"
         image_path = self.test_images[image_id]
         
         # First save the image
         self.minio_db.save_image(
-            doc_id=self.test_doc_id,
-            image_id=image_id,
+            object_name=image_id,
             image_path=image_path
         )
         
         # Retrieve image as bytes
-        image_data = self.minio_db.get_image(
-            doc_id=self.test_doc_id,
-            image_id=image_id
-        )
+        image_data = self.minio_db.get_image(image_id)
         
         self.assertIsNotNone(image_data)
         # Verify it's valid image data by trying to open it with PIL
         img = Image.open(io.BytesIO(image_data))
         self.assertEqual(img.size, (100, 100))  # First test image size
+        print("✅ test_get_image_as_bytes passed!")
 
-    def test_get_image_save_to_file(self):
-        """Test retrieving image and saving to file"""
+    def test_delete_existing_image(self):
+        """Test deleting an existing image"""
+        print("🧪 Running test: delete_existing_image")
         image_id = f"{self.test_doc_id}_img_1"
-        original_path = self.test_images[image_id]
+        image_path = self.test_images[image_id]
         
         # First save the image
-        self.minio_db.save_image(
-            doc_id=self.test_doc_id,
-            image_id=image_id,
-            image_path=original_path
+        result = self.minio_db.save_image(
+            object_name=image_id,
+            image_path=image_path
         )
-        
-        # Retrieve and save to new file
-        output_path = os.path.join(self.temp_dir, "retrieved_image.png")
-        self.minio_db.get_image(
-            doc_id=self.test_doc_id,
-            image_id=image_id,
-            save_path=output_path
-        )
-        
-        # Verify file exists and is an image
-        self.assertTrue(os.path.exists(output_path))
-        img = Image.open(output_path)
-        self.assertEqual(img.size, (150, 150))  # Second test image size
-
-    def test_delete_doc_images(self):
-        """Test deleting all images for a document"""
-        # First save all test images
-        for image_id, image_path in self.test_images.items():
-            self.minio_db.save_image(
-                doc_id=self.test_doc_id,
-                image_id=image_id,
-                image_path=image_path
-            )
-        
-        # Verify images were saved
-        saved_images = self.minio_db.list_doc_images(self.test_doc_id)
-        self.assertEqual(len(saved_images), len(self.test_images))
-        
-        # Delete all images
-        result = self.minio_db.delete_doc_images(self.test_doc_id)
         self.assertTrue(result)
         
-        # Verify images were deleted
-        remaining_images = self.minio_db.list_doc_images(self.test_doc_id)
-        self.assertEqual(len(remaining_images), 0)
-
-    def test_list_doc_images(self):
-        """Test listing all images for a document"""
-        # First save all test images
-        for image_id, image_path in self.test_images.items():
-            self.minio_db.save_image(
-                doc_id=self.test_doc_id,
-                image_id=image_id,
-                image_path=image_path
-            )
+        # Verify image exists
+        image_data = self.minio_db.get_image(image_id)
+        self.assertIsNotNone(image_data)
         
-        # List images
-        image_list = self.minio_db.list_doc_images(self.test_doc_id)
+        # Delete the image
+        delete_result = self.minio_db.delete_image(image_id)
+        self.assertTrue(delete_result)
         
-        # Verify list contents
-        self.assertEqual(len(image_list), len(self.test_images))
-        for image_id in self.test_images.keys():
-            self.assertIn(image_id, image_list)
+        # Verify image is deleted
+        deleted_image_data = self.minio_db.get_image(image_id)
+        self.assertIsNone(deleted_image_data)
+        print("✅ test_delete_existing_image passed!")
 
-    def test_nonexistent_image(self):
-        """Test handling of non-existent images"""
-        # Try to get non-existent image
-        image_data = self.minio_db.get_image(
-            doc_id=self.test_doc_id,
-            image_id="nonexistent_image"
+    '''
+    def test_delete_nonexistent_image(self):
+        """Test deleting a non-existent image"""
+        non_existent_image_id = "non_existent_image"
+
+        # Ensure the image doesn't exist first
+        if self.minio_db.get_image(non_existent_image_id) is not None:
+            self.minio_db.delete_image(non_existent_image_id)
+            self.asser
+        # Try to delete non-existent image
+        
+        self.assertFalse(delete_result)
+    '''
+
+    def test_delete_image_verification(self):
+        """Test complete workflow: save, verify, delete, verify"""
+        print("🧪 Running test: delete_image_verification")
+        image_id = f"{self.test_doc_id}_img_2"
+        image_path = self.test_images[image_id]
+        
+        # Step 1: Save image
+        save_result = self.minio_db.save_image(
+            object_name=image_id,
+            image_path=image_path
         )
-        self.assertIsNone(image_data)
+        self.assertTrue(save_result)
+        
+        # Step 2: Verify image exists
+        image_data = self.minio_db.get_image(image_id)
+        self.assertIsNotNone(image_data)
+        
+        # Step 3: Delete image
+        delete_result = self.minio_db.delete_image(image_id)
+        self.assertTrue(delete_result)
+        
+        # Step 4: Verify image is deleted
+        deleted_image_data = self.minio_db.get_image(image_id)
+        self.assertIsNone(deleted_image_data)
+        print("✅ test_delete_image_verification passed!")
+
 
     @classmethod
     def tearDownClass(cls):
         """Clean up test data and MinIO bucket"""
-        # Delete test bucket and all its contents
+        print("🧹 Cleaning up test data...")
+        
+        # Delete all test images
         try:
-            cls.minio_db.delete_doc_images(cls.test_doc_id)
+            for image_id in cls.test_images.keys():
+                cls.minio_db.delete_image(image_id)
         except:
             pass  # Ignore errors during cleanup
         
@@ -196,6 +203,8 @@ class TestMinioImageDB(unittest.TestCase):
             shutil.rmtree(cls.temp_dir)
         except:
             pass  # Ignore errors during cleanup
+        
+        print("✅ Test cleanup completed!")
 
 if __name__ == '__main__':
     unittest.main() 

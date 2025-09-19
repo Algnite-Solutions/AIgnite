@@ -135,11 +135,12 @@ class PaperIndexer(BaseIndexer):
         '''
        
 
-    def index_papers(self, papers: List[DocSet]) -> Dict[str, Dict[str, bool]]:
+    def index_papers(self, papers: List[DocSet],store_images: bool = False,keep_temp_image: bool = False) -> Dict[str, Dict[str, bool]]:
         """Index a list of papers into available databases.
         
         Args:
             papers: List of DocSet objects containing paper information
+            store_images: Whether to store images to MinIO (default: False)
             
         Returns:
             Dictionary mapping doc_ids to their indexing status for each database type
@@ -165,6 +166,7 @@ class PaperIndexer(BaseIndexer):
                     "published_date": paper.published_date,
                     "chunk_ids": [chunk.id for chunk in paper.text_chunks],
                     "figure_ids": [chunk.id for chunk in paper.figure_chunks],
+                    "image_storage": {f"{paper.doc_id}_{chunk.id}": False for chunk in paper.figure_chunks},
                     "comments": paper.comments  # Store comments field
                 }
                 # Store metadata if database is available
@@ -204,28 +206,226 @@ class PaperIndexer(BaseIndexer):
                         logger.error(f"Failed to store vectors for {paper.doc_id}: {str(e)}")
                 
                 # Store images if database is available and paper has figures
-                if self.image_db is not None and paper.figure_chunks:
+                if store_images and self.image_db is not None and paper.figure_chunks:
                     try:
                         image_successes = []
                         for figure in tqdm(paper.figure_chunks, desc=f"Storing figures for {paper.doc_id}", leave=False):
-                            success = self.image_db.save_image(
-                                doc_id=paper.doc_id,
-                                image_id=figure.id,
-                                image_path=figure.image_path
-                            )
+                            success = self._save_image(figure.image_path, paper.doc_id+'_'+figure.id,keep_temp_image)
                             image_successes.append(success)
                             logger.debug(f"Saved image {figure.id} for {paper.doc_id}: {success}")
                         paper_status["images"] = all(image_successes)
                     except Exception as e:
                         logger.error(f"Failed to store images for {paper.doc_id}: {str(e)}")
+                        paper_status["images"] = False
                 
                 indexing_status[paper.doc_id] = paper_status
                 
         except Exception as e:
             logger.error(f"Failed to index papers: {str(e)}")
             raise RuntimeError(f"Failed to index papers: {str(e)}")
-            
+        
         return indexing_status
+
+    def save_vectors(self, papers: List[DocSet],indexing_status: Dict[str, Dict[str, bool]]=None):
+        try:
+            for paper in papers:
+                success = self.vector_db.add_document(
+                            vector_db_id=paper.doc_id+'_abstract',
+                            text_to_emb=paper.title+' . '+paper.abstract,
+                            doc_metadata={"doc_id": paper.doc_id, "text_type": "abstract"}
+                        )
+                logger.debug(f"Saved vectors for {paper.doc_id}: {success}")
+                if indexing_status:
+                    indexing_status[paper.doc_id]["vectors"] = True
+        except Exception as e:
+            logger.error(f"Failed to save vectors: {str(e)}")
+            raise RuntimeError(f"Failed to save vectors: {str(e)}")
+            return False
+        return indexing_status
+
+
+    def store_images(self, papers: List[DocSet], indexing_status: Dict[str, Dict[str, bool]] = None, keep_temp_image: bool = False):
+        """Store images from papers to MinIO storage.
+        
+        Args:
+            papers: List of DocSet objects containing papers with figure_chunks
+            indexing_status: Optional dictionary to track indexing status
+            keep_temp_image: If False, delete temporary image files after successful storage
+            
+        Returns:
+            indexing_status dictionary with updated image storage status
+        """
+        try:
+            for paper in papers:
+                for figure in paper.figure_chunks:
+                    success = self._save_image(figure.image_path, paper.doc_id+'_'+figure.id,keep_temp_image)
+                    logger.debug(f"Saved image {figure.id} for {paper.doc_id}: {success}")
+                    
+                    """
+                    # Delete temporary image file if storage was successful and keep_temp_image is False
+                    if success and not keep_temp_image and figure.image_path:
+                        try:
+                            import os
+                            if os.path.exists(figure.image_path):
+                                os.remove(figure.image_path)
+                                logger.debug(f"Deleted temporary image file: {figure.image_path}")
+                        except Exception as e:
+                            logger.warning(f"Failed to delete temporary image {figure.image_path}: {str(e)}")
+                    """
+                if indexing_status:
+                    indexing_status[paper.doc_id]["images"] = True
+        except Exception as e:
+            logger.error(f"Failed to store images: {str(e)}")
+            raise RuntimeError(f"Failed to store images: {str(e)}")
+            return False
+        return indexing_status
+        
+    '''
+    The logic of saving image is:
+    1. Save image to MinIO
+    2. Update storage status in metadata database
+    3. Return the result. If the result is True, the image is saved successfully or image is already in MinIO, and the storage status is updated in metadata database.
+    '''    
+    def _save_image(self, image_path: str, object_name: str,keep_temp_image: bool = False):
+        if self.image_db is not None and image_path:
+            try:
+                minio_success = self.image_db.save_image(
+                    object_name=object_name,
+                    image_path=image_path
+                )
+                
+                # Update storage status in metadata database
+                if minio_success and self.metadata_db is not None:
+                    # Extract docid and figureid from object_name (format: docid_figureid)
+                    if '_' in object_name and object_name.count('_') == 1:
+                        doc_id, figure_id = object_name.split('_', 1)
+                        metadata_success = self.metadata_db.update_image_storage_status(doc_id, figure_id, True)
+                        logger.debug(f"Updated storage status for {object_name}: minio_success={minio_success}, metadata_success={metadata_success}")
+                    else:
+                        logger.warning(f"Invalid object_name format: {object_name}")
+                    if not keep_temp_image:
+                        try:
+                            import os
+                            if os.path.exists(image_path):
+                                os.remove(image_path)
+                                logger.debug(f"Deleted temporary image file: {image_path}")
+                        except Exception as e:
+                            logger.warning(f"Failed to delete temporary image {image_path}: {str(e)}")
+                    
+                elif not minio_success :
+                    # Update storage status to False if save failed
+                    if '_' in object_name:
+                        doc_id, figure_id = object_name.split('_', 1)
+                        metadata_success = self.metadata_db.update_image_storage_status(doc_id, figure_id, False)
+                        logger.debug(f"Updated storage status for {object_name}: minio_success={minio_success}, metadata_success={metadata_success}")
+                
+                return minio_success and metadata_success
+            except Exception as e:
+                logger.error(f"Failed to save image for {object_name}: {str(e)}")
+                # Update storage status to False on error
+                if self.metadata_db is not None and '_' in object_name:
+                    doc_id, figure_id = object_name.split('_', 1)
+                    self.metadata_db.update_image_storage_status(doc_id, figure_id, False)
+                return False
+        else:
+            logger.error(f"Failed to save image for {object_name}: image_db is None or image_path is empty")
+            return False
+
+    def _get_image(self, object_name: str):
+        if self.image_db is not None:
+            try:
+                return self.image_db.get_image(object_name)
+            except Exception as e:
+                logger.error(f"Failed to get image for {object_name}: {str(e)}")
+                return None
+        else:
+            logger.error(f"Failed to get image for {object_name}: image_db is None")
+            return None
+
+
+    def _delete_image(self, image_id: str):
+        if self.image_db is not None:
+            try:
+                [doc_id, figure_id] = image_id.split("_")
+                
+                # Delete from MinIO storage
+                minio_success = self.image_db.delete_image(image_id)
+                
+                # Update metadata database
+                metadata_success = False
+                if self.metadata_db is not None:
+                    # Also update storage status to False
+                    metadata_success = self.metadata_db.update_image_storage_status(doc_id, figure_id, False)
+                    logger.debug(f"Updated storage status for {image_id}: stored=False")
+                
+                return minio_success and metadata_success
+            except Exception as e:
+                logger.error(f"Failed to delete image for {image_id}: {str(e)}")
+                # Update storage status to False on error
+                if self.metadata_db is not None and '_' in image_id:
+                    doc_id, figure_id = image_id.split('_', 1)
+                    self.metadata_db.update_image_storage_status(doc_id, figure_id, False)
+                return False
+        else:
+            logger.error(f"Failed to delete image for {image_id}: image_db is None")
+            return False
+
+    def _list_image_ids(self, doc_id: str):
+        """
+        List all image IDs for a document. 
+
+        Args:
+            doc_id: Document ID
+
+        Returns:
+            List of image IDs
+
+        Please Note: The image IDs are in the format of {doc_id}_{figure_id}. It does not represent the image storage status.
+        """
+        if self.metadata_db is not None:
+            try:
+                return self.metadata_db.get_image_ids(doc_id)
+            except Exception as e:
+                logger.error(f"Failed to list images for {doc_id}: {str(e)}")
+                return []
+        else:
+            logger.error(f"Failed to list images for {doc_id}: image_db is None or metadata_db is None")
+            return []
+
+    def get_image_storage_status_for_doc(self, doc_id: str) -> Dict[str, bool]:
+        """Get storage status for all figures in a document.
+        
+        Args:
+            doc_id: Document ID
+            
+        Returns:
+            Dictionary mapping figure_id to storage status
+        """
+        if self.metadata_db is not None:
+            try:
+                return self.metadata_db.get_image_storage_status_for_doc(doc_id)
+            except Exception as e:
+                logger.error(f"Failed to get figure storage status for {doc_id}: {str(e)}")
+                return {}
+        else:
+            logger.error(f"Failed to get figure storage status for {doc_id}: metadata_db is None")
+            return {}
+
+    def _delete_images_by_doc_id(self, doc_id: str):
+        if self.metadata_db is not None:
+            #image_ids = self._list_image_ids(doc_id)
+            image_storage_status=self.get_image_storage_status_for_doc(doc_id)
+            image_ids = [image_id if image_storage_status[image_id] else None for image_id in image_storage_status.keys()]
+            print('IN _delete_images_by_doc_id')
+            print(image_storage_status)
+            print(image_ids)
+            for image_id in image_ids:
+                self._delete_image(image_id)
+            print(f"Deleted {len(image_ids)} images for {doc_id}")
+            return True
+        else:
+            logger.error(f"Failed to delete images for {doc_id}: metadata_db is None")
+            return False
 
     def find_similar_papers(
         self, 
@@ -374,11 +574,12 @@ class PaperIndexer(BaseIndexer):
             # Delete images if available and metadata exists
             if self.image_db is not None and metadata and metadata.get("figure_ids"):
                 try:
-                    success = self.image_db.delete_doc_images(doc_id)
+                    success = self._delete_images_by_doc_id(doc_id)
                     deletion_status["images"] = success
                     logger.debug(f"Deleted images: {success}")
                 except Exception as e:
                     logger.error(f"Failed to delete images: {str(e)}")
+                    deletion_status["images"] = False
             
             # Delete from metadata database if available
             if self.metadata_db is not None:
