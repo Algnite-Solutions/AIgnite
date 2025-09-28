@@ -1,8 +1,10 @@
 """Database modules for AIgnite."""
 from typing import Dict, Any, Optional, List
+from datasets.features import image
 from sqlalchemy import create_engine, Column, String, Integer, JSON, Text, LargeBinary, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, declared_attr
+from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy import text, Index
 from sqlalchemy.sql import func
 import logging
@@ -31,6 +33,7 @@ class TableSchema(Base):
     pdf_data = Column(LargeBinary)
     chunk_ids = Column(JSON)  # Store text chunk IDs
     figure_ids = Column(JSON)  # Store figure chunk IDs
+    image_storage = Column(JSON)  # Store figure storage status: {"docid_figureid1": true, "docid_figureid2": false}
     table_ids = Column(JSON)  # Store table chunk IDs
     extra_metadata = Column(JSON)  # Store metadata dict
     pdf_path = Column(String)
@@ -58,6 +61,11 @@ class TableSchema(Base):
         Returns:
             TableSchema instance initialized with DocSet data
         """
+        # Initialize image_storage status - all figures start as not stored
+        image_storage_status = {}
+        for chunk in docset.figure_chunks:
+            image_storage_status[f"{docset.doc_id}_{chunk.id}"] = False
+        
         return cls(
             doc_id=docset.doc_id,
             title=docset.title,
@@ -68,6 +76,7 @@ class TableSchema(Base):
             pdf_data=pdf_data,
             chunk_ids=[chunk.id for chunk in docset.text_chunks],
             figure_ids=[chunk.id for chunk in docset.figure_chunks],
+            image_storage=image_storage_status,  # Initialize storage status
             table_ids=[chunk.id for chunk in docset.table_chunks],
             extra_metadata=docset.metadata,
             pdf_path=docset.pdf_path,
@@ -91,6 +100,7 @@ class TableSchema(Base):
             'published_date': self.published_date,
             'chunk_ids': self.chunk_ids,
             'figure_ids': self.figure_ids,
+            'image_storage': self.image_storage,  # Include figure storage status
             'table_ids': self.table_ids,
             'metadata': self.extra_metadata,
             'blog': self.blog,  # Include blog field in output
@@ -318,6 +328,7 @@ class MetadataDB:
                 pdf_data=pdf_data,
                 chunk_ids=metadata.get('chunk_ids', []),
                 figure_ids=metadata.get('figure_ids', []),
+                image_storage=metadata.get('image_storage', {}),  # Initialize image storage status
                 table_ids=metadata.get('table_ids', []),
                 extra_metadata=metadata.get('metadata', {}),
                 pdf_path=pdf_path,
@@ -771,3 +782,125 @@ class MetadataDB:
             return []
         finally:
             session.close()
+
+
+    def get_image_ids(self, doc_id: str) -> List[str]:
+        """Get all image IDs for a document.
+        
+        Args:
+            doc_id: Document ID
+            
+        Returns:
+            List of image IDs that are actually stored (have True status in image_storage)
+        """
+        session = self.Session()
+        try:
+            paper = session.query(TableSchema).filter_by(doc_id=doc_id).first()
+            if not paper:
+                return []
+            
+            # Return image IDs from image_storage field where status is True
+            image_ids = []
+            if paper.image_storage:
+                for image_key, is_stored in paper.image_storage.items():
+                    if is_stored:
+                        image_ids.append(image_key)
+            return image_ids
+            
+        except Exception as e:
+            logging.error(f"Failed to get image IDs for doc_id {doc_id}: {str(e)}")
+            return []
+        finally:
+            session.close()
+
+
+    def update_image_storage_status(self, doc_id: str, figure_id: str, stored: bool) -> bool:
+        """Update storage status for a specific figure.
+        
+        Args:
+            doc_id: Document ID
+            figure_id: Figure ID to update
+            stored: Storage status (True if stored, False if not)
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        session = self.Session()
+        try:
+            paper = session.query(TableSchema).filter_by(doc_id=doc_id).first()
+            if not paper:
+                return False
+            
+            # Initialize image_storage if it doesn't exist
+            if paper.image_storage is None:
+                paper.image_storage = {}
+            
+            # Update storage status
+            paper.image_storage[doc_id+'_'+figure_id] = stored
+            flag_modified(paper, 'image_storage')
+            session.commit()
+            
+            logger.debug(f"Updated image storage status for {doc_id}_{figure_id}: {stored}")
+            return True
+            
+        except Exception as e:
+            session.rollback()
+            logging.error(f"Failed to update image storage status for {doc_id}_{figure_id}: {str(e)}")
+            return False
+        finally:
+            session.close()
+
+    def get_image_storage_status_for_doc(self, doc_id: str) -> Dict[str, bool]:
+        """Get storage status for all figures in a document.
+        
+        Args:
+            doc_id: Document ID
+            
+        Returns:
+            Dictionary mapping figure_id to storage status
+        """
+        session = self.Session()
+        try:
+            paper = session.query(TableSchema).filter_by(doc_id=doc_id).first()
+            if not paper:
+                return {}
+            
+            return paper.image_storage or {}
+            
+        except Exception as e:
+            logging.error(f"Failed to get image storage status for {doc_id}: {str(e)}")
+            return {}
+        finally:
+            session.close()
+
+    """
+    def delete_figure_id(self, doc_id: str, figure_id: str) -> bool:
+        '''
+        Delete image saving records in metadata database
+        '''
+        try:
+            paper = session.query(TableSchema).filter_by(doc_id=doc_id).first()
+            if not paper:
+                return False
+            if figure_id in paper.figure_ids:
+                paper.figure_ids.remove(figure_id)
+                # Mark the field as modified for SQLAlchemy using flag_modified
+                flag_modified(paper, 'figure_ids')
+                
+                # Also update figure_storage status to False
+                if paper.figure_storage and figure_id in paper.figure_storage:
+                    paper.figure_storage[figure_id] = False
+                    flag_modified(paper, 'figure_storage')
+                
+                logger.debug(f"Deleted figure ID {figure_id} for doc_id {doc_id} from metadata records")
+                session.commit()
+            else:
+                logger.warning(f"Figure ID {figure_id} not found for doc_id {doc_id}")
+                return False
+            return True
+        except Exception as e:
+            logging.error(f"Failed to delete image ID for doc_id {doc_id} and figure_id {figure_id}: {str(e)}")
+            return False
+        finally:
+            session.close()
+    """

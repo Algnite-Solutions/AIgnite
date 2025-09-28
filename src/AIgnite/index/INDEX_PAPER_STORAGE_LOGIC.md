@@ -47,9 +47,11 @@ class DocSet:
     text_chunks: List[Chunk]      # 文本块列表
     figure_chunks: List[Chunk]    # 图像块列表
     table_chunks: List[Chunk]     # 表格块列表
+    metadata: dict                 # 额外元数据
     pdf_path: str                  # PDF文件路径
     HTML_path: str                 # HTML文件路径
     comments: str | None           # 论文评论/备注
+    blog: str | None               # 博客内容
 ```
 
 #### Metadata构建
@@ -62,7 +64,7 @@ metadata = {
     "published_date": paper.published_date,  # 发布日期
     "chunk_ids": [chunk.id for chunk in paper.text_chunks],     # 文本块ID列表
     "figure_ids": [chunk.id for chunk in paper.figure_chunks],  # 图像块ID列表
-    "table_ids": [chunk.id for chunk in paper.table_chunks],    # 表格块ID列表
+    "image_storage": {f"{paper.doc_id}_{chunk.id}": False for chunk in paper.figure_chunks},  # 图片存储状态初始化
     "comments": paper.comments               # 论文评论/备注
 }
 ```
@@ -81,8 +83,54 @@ if self.metadata_db is not None and hasattr(paper, 'pdf_path'):
 - 结构化数据：标题、摘要、作者、分类、发布日期
 - PDF二进制数据：完整的PDF文件内容
 - 文本块内容：完整的文本块内容，使用doc_id+chunk_id作为唯一标识
-- 引用关系：文本块ID、图像块ID、表格块ID
+- 引用关系：文本块ID、图像块ID
+- 图片存储状态：image_storage字段记录每个图片的实际存储状态（初始化为False）
 - 文件路径：PDF路径、HTML路径
+- 论文评论：comments字段存储论文评论/备注
+
+**图像ID查询功能**
+```python
+def get_image_ids(self, doc_id: str) -> List[str]:
+    """Get all image IDs for a document.
+    
+    Args:
+        doc_id: Document ID
+        
+    Returns:
+        List of image IDs
+    """
+```
+
+**图片存储状态管理功能**
+```python
+def update_image_storage_status(self, doc_id: str, figure_id: str, stored: bool) -> bool:
+    """Update storage status for a specific figure.
+    
+    Args:
+        doc_id: Document ID
+        figure_id: Figure ID to update
+        stored: Storage status (True if stored, False if not)
+        
+    Returns:
+        True if successful, False otherwise
+    """
+
+def get_image_storage_status_for_doc(self, doc_id: str) -> Dict[str, bool]:
+    """Get storage status for all figures in a document.
+    
+    Args:
+        doc_id: Document ID
+        
+    Returns:
+        Dictionary mapping figure_id to storage status
+    """
+```
+
+**查询实现**
+- 从papers表的image_storage字段获取图片存储状态
+- 支持None值处理，返回空列表/空字典
+- 完整的异常处理和数据库会话管理
+- 与现有数据库查询模式保持一致
 
 **数据库表结构**
 ```sql
@@ -98,6 +146,7 @@ CREATE TABLE papers (
     pdf_data BYTEA,
     chunk_ids JSON,
     figure_ids JSON,
+    image_storage JSON,  -- 图片存储状态：{"docid_figureid1": true, "docid_figureid2": false}
     table_ids JSON,
     extra_metadata JSON,
     pdf_path VARCHAR,
@@ -116,6 +165,26 @@ CREATE TABLE text_chunks (
     FOREIGN KEY (doc_id) REFERENCES papers(doc_id) ON DELETE CASCADE
 );
 ```
+
+**删除功能**
+```python
+def delete_paper(self, doc_id: str) -> Tuple[bool, bool]:
+    """Delete paper and its metadata, including all text chunks.
+    
+    Args:
+        doc_id: Document ID
+        
+    Returns:
+        Tuple of (paper_metadata_deleted, text_chunks_deleted)
+    """
+```
+
+**删除功能特点**
+- 级联删除：先删除文本块，再删除论文元数据
+- 外键约束处理：遵循数据库外键约束顺序
+- 事务安全：使用数据库事务确保数据一致性
+- 返回状态：分别返回元数据和文本块删除状态
+- 完整清理：删除所有关联数据，包括PDF、文本块、图片引用等
 
 #### VectorDB (FAISS) - 向量存储
 
@@ -175,21 +244,151 @@ class VectorEntry:
 
 #### MinioImageDB (MinIO) - 图像存储
 
-**存储条件**
+**存储场景设计**
+
+PaperIndexer 支持两种图像存储场景：
+
+1. **集成存储场景**：在 `index_papers` 方法中与元数据同时存储
+2. **独立存储场景**：通过 `store_images` 方法在元数据存储后单独存储图像
+
+**集成存储场景（index_papers）**
 ```python
-if self.image_db is not None and paper.figure_chunks:
+# 在 index_papers 方法中
+if store_images and self.image_db is not None and paper.figure_chunks:
     for figure in paper.figure_chunks:
-        success = self.image_db.save_image(
-            doc_id=paper.doc_id,
-            image_id=figure.id,
-            image_path=figure.image_path
-        )
+        success = self._save_image(figure.image_path, paper.doc_id+'_'+figure.id)
+```
+
+**独立存储场景（store_images）**
+```python
+def store_images(self, papers: List[DocSet], indexing_status: Dict[str, Dict[str, bool]] = None, keep_temp_image: bool = False):
+    """Store images from papers to MinIO storage.
+    
+    Args:
+        papers: List of DocSet objects containing papers with figure_chunks
+        indexing_status: Optional dictionary to track indexing status
+        keep_temp_image: If False, delete temporary image files after successful storage
+        
+    Returns:
+        indexing_status dictionary with updated image storage status
+    """
+    for paper in papers:
+        for figure in paper.figure_chunks:
+            success = self._save_image(figure.image_path, paper.doc_id+'_'+figure.id, keep_temp_image)
+```
+
+**核心存储实现（_save_image）**
+```python
+def _save_image(self, image_path: str, object_name: str, keep_temp_image: bool = False):
+    """Core image storage method used by both index_papers and store_images.
+    
+    Args:
+        image_path: Path to the image file
+        object_name: Object name for MinIO storage (format: doc_id_figure_id)
+        keep_temp_image: If False, delete temporary image files after successful storage
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    if self.image_db is not None and image_path:
+        try:
+            # 1. Save image to MinIO
+            minio_success = self.image_db.save_image(
+                object_name=object_name,
+                image_path=image_path
+            )
+            
+            # 2. Update storage status in metadata database
+            if minio_success and self.metadata_db is not None:
+                if '_' in object_name:
+                    doc_id, figure_id = object_name.split('_', 1)
+                    metadata_success = self.metadata_db.update_image_storage_status(doc_id, figure_id, True)
+                    
+                    # 3. Handle temporary file cleanup
+                    if not keep_temp_image:
+                        try:
+                            import os
+                            if os.path.exists(image_path):
+                                os.remove(image_path)
+                                logger.debug(f"Deleted temporary image file: {image_path}")
+                        except Exception as e:
+                            logger.warning(f"Failed to delete temporary image {image_path}: {str(e)}")
+                            
+            elif not minio_success and self.metadata_db is not None:
+                # Update storage status to False if save failed
+                if '_' in object_name:
+                    doc_id, figure_id = object_name.split('_', 1)
+                    metadata_success = self.metadata_db.update_image_storage_status(doc_id, figure_id, False)
+            
+            return minio_success and metadata_success
+        except Exception as e:
+            # Update storage status to False on error
+            if self.metadata_db is not None and '_' in object_name:
+                doc_id, figure_id = object_name.split('_', 1)
+                self.metadata_db.update_image_storage_status(doc_id, figure_id, False)
+            return False
 ```
 
 **存储内容**
 - 图像文件：论文中的图表、图像等视觉内容
-- 对象命名：`{doc_id}/{image_id}`的层次结构
-- 元数据：图像ID和文档ID的关联关系
+- 对象命名：`{doc_id}_{figure_id}`的扁平结构（如：`2106.14834_fig1`）
+- 存储方式：直接使用 `object_name` 作为 MinIO 存储的对象名
+- 元数据：通过对象名中的 `doc_id` 和 `figure_id` 组合来维护关联关系
+
+**图像存储逻辑设计**
+
+1. **双重存储场景支持**：
+   - `index_papers(store_images=True)`：集成存储，与元数据同时处理
+   - `store_images(papers, keep_temp_image=False)`：独立存储，元数据存储后单独处理图像
+
+2. **核心存储方法（_save_image）**：
+   - 被 `index_papers` 和 `store_images` 共同使用
+   - 负责 MinIO 存储、元数据状态更新、临时文件清理
+   - 支持 `keep_temp_image` 参数控制临时文件处理
+
+3. **存储状态管理**：
+   - 成功存储：更新 `image_storage` 状态为 `True`
+   - 存储失败：更新 `image_storage` 状态为 `False`
+   - 状态同步：确保 MinIO 存储状态与数据库记录一致
+
+4. **临时文件处理**：
+   - `keep_temp_image=False`：存储成功后删除临时文件
+   - `keep_temp_image=True`：保留临时文件（用于调试或后续处理）
+
+**使用场景示例**
+
+```python
+# 场景1：集成存储（推荐用于新论文索引）
+indexing_results = indexer.index_papers(papers, store_images=True)
+
+# 场景2：独立存储（用于元数据已存储的论文）
+# 先存储元数据
+indexing_results = indexer.index_papers(papers, store_images=False)
+# 后单独存储图像
+indexer.store_images(papers, indexing_results, keep_temp_image=False)
+
+# 场景3：保留临时文件的独立存储（用于调试）
+indexer.store_images(papers, keep_temp_image=True)
+```
+
+**图像删除功能**
+```python
+def delete_image(self, image_id: str) -> bool:
+    """Delete an image from MinIO storage by image_id.
+    
+    Args:
+        image_id: Image ID (used as object_name in MinIO)
+        
+    Returns:
+        True if successful, False otherwise
+    """
+```
+
+**删除功能特点**
+- 直接通过image_id删除MinIO中的图像对象
+- 支持NoSuchKey错误处理（图像不存在）
+- 返回布尔值表示操作成功与否
+- 完整的异常处理和日志记录
 
 ### 3. 状态跟踪
 
@@ -429,9 +628,75 @@ SUPPORTED_INCLUDE_TYPES = {
     "search_parameters",  # 搜索参数
     "text_chunks",        # 文本块内容
     "full_text",          # 完整文本
-    "images"              # 图像数据
+    "images"              # 图像数据（图像ID列表）
 }
 ```
+
+#### 图像管理功能
+
+**PaperIndexer图像管理方法**
+```python
+def _delete_image(self, image_id: str):
+    """Delete an image by image_id.
+    
+    Args:
+        image_id: Image ID to delete
+        
+    Returns:
+        True if successful, False otherwise
+    """
+
+def _list_image_ids(self, doc_id: str):
+    """List all image IDs for a document.
+    
+    Args:
+        doc_id: Document ID
+        
+    Returns:
+        List of image IDs
+    """
+
+def get_image_storage_status_for_doc(self, doc_id: str) -> Dict[str, bool]:
+    """Get storage status for all figures in a document.
+    
+    Args:
+        doc_id: Document ID
+        
+    Returns:
+        Dictionary mapping figure_id to storage status
+    """
+
+def _delete_images_by_doc_id(self, doc_id: str):
+    """Delete all images for a document by doc_id.
+    
+    Args:
+        doc_id: Document ID
+        
+    Returns:
+        True if successful, False otherwise
+    """
+```
+
+**批量删除实现逻辑**
+```python
+def _delete_images_by_doc_id(self, doc_id: str):
+    if self.metadata_db is not None:
+        image_storage_status = self.get_image_storage_status_for_doc(doc_id)
+        image_ids = [image_id for image_id in image_storage_status.keys() if image_storage_status[image_id]]
+        for image_id in image_ids:
+            self._delete_image(image_id)
+        print(f"Deleted {len(image_ids)} images for {doc_id}")
+        return True
+```
+
+**图像管理特点**
+- 提供统一的图像管理接口
+- 桥接MinIO图像存储和MetadataDB元数据查询
+- 支持图片存储状态的精确跟踪和管理
+- 完整的错误处理和日志记录
+- 支持图像生命周期的完整管理（存储、查询、删除、状态跟踪）
+- 支持批量删除功能，通过doc_id删除文档的所有图像
+- 确保MinIO存储状态与数据库状态的一致性
 
 ## 数据关联关系
 
@@ -439,13 +704,21 @@ SUPPORTED_INCLUDE_TYPES = {
 - **doc_id**：所有三个数据库的主关联键
 - **doc_id + chunk_id**：文本块在全文存储表中的唯一标识
 - **vector_db_id**：向量在FAISS数据库中的唯一标识（替代原来的chunk_id）
-- **image_id**：图像在MinIO中的唯一标识
+- **object_name**：图像在MinIO中的唯一标识（格式：`{doc_id}_{figure_id}`）
 
 ### 引用关系
 ```python
 metadata = {
     "chunk_ids": ["chunk_001", "chunk_002", "chunk_003"],
     "figure_ids": ["fig_001", "fig_002"],
-    "table_ids": ["table_001"]
+    "image_storage": {"docid_fig_001": True, "docid_fig_002": False}  # 图片存储状态（初始化为False，后续动态更新）
 }
 ```
+
+### 图片存储状态管理
+- **figure_ids**：记录文档中应该存在的图片ID列表
+- **image_storage**：记录每个图片的实际存储状态（True=已存储，False=未存储）
+  - 该字段在metadata构建时初始化为False状态
+  - 在图片存储/删除操作时动态更新状态
+- **状态同步**：图片存储/删除操作会自动更新image_storage状态
+- **数据一致性**：确保MinIO存储状态与数据库记录的一致性

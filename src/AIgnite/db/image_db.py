@@ -6,6 +6,16 @@ from minio.error import S3Error
 from PIL import Image
 import io
 
+'''
+docker run -p 9081:9081 -p 9091:9091 \
+  -e MINIO_ROOT_USER=XOrv2wfoWfPypp2zGIae \
+  -e MINIO_ROOT_PASSWORD=k9agaJuX2ZidOtaBxdc9Q2Hz5GnNKncNBnEZIoK3 \
+  -v /home/guofang/AIgnite-Solutions/AIgnite/src/AIgnite/db/minio/data:/data \
+  -v /home/guofang/AIgnite-Solutions/AIgnite/src/AIgnite/db/minio/config:/root/.minio \
+  quay.io/minio/minio server /data \
+  --address ":9081" --console-address ":9091"
+'''
+
 class MinioImageDB:
     def __init__(
         self,
@@ -44,16 +54,14 @@ class MinioImageDB:
 
     def save_image(
         self,
-        doc_id: str,
-        image_id: str,
+        object_name: str,
         image_path: str = None,
         image_data: bytes = None
     ) -> bool:
         """Save an image to MinIO storage.
         
         Args:
-            doc_id: Document ID
-            image_id: Image ID
+            object_name: Object name to use for storage in MinIO
             image_path: Path to image file (mutually exclusive with image_data)
             image_data: Raw image bytes (mutually exclusive with image_path)
             
@@ -67,10 +75,11 @@ class MinioImageDB:
             if image_path and image_data:
                 raise ValueError("Only one of image_path or image_data should be provided")
             
-            # Generate MinIO object name
-            object_name = f"{doc_id}/{image_id}"
-            
             # Handle image path
+            if self.get_image(object_name):
+                logging.warning(f"Image with object_name {object_name} already exists")
+                return True
+            
             if image_path:
                 # Verify file exists
                 if not os.path.exists(image_path):
@@ -102,28 +111,23 @@ class MinioImageDB:
             return True
             
         except Exception as e:
-            logging.error(f"Failed to save image {image_id} for doc {doc_id}: {str(e)}")
+            logging.error(f"Failed to save image with object_name {object_name}: {str(e)}")
             return False
 
     def get_image(
         self,
-        doc_id: str,
-        image_id: str,
-        save_path: str = None
+        object_name: str,
     ) -> Optional[bytes]:
         """Retrieve an image from MinIO storage.
         
         Args:
-            doc_id: Document ID
-            image_id: Image ID
+            object_name: Object name in MinIO storage
             save_path: Optional path to save the image file
             
         Returns:
             Image bytes if save_path is None, otherwise None
         """
         try:
-            object_name = f"{doc_id}/{image_id}"
-            
             # Get object data
             try:
                 response = self.client.get_object(
@@ -137,77 +141,37 @@ class MinioImageDB:
                 if e.code == 'NoSuchKey':
                     return None
                 raise
-            
-            # Save to file if path provided
-            if save_path:
-                os.makedirs(os.path.dirname(save_path), exist_ok=True)
-                with open(save_path, 'wb') as f:
-                    f.write(image_data)
-                return None
-            
             return image_data
             
         except Exception as e:
-            logging.error(f"Failed to get image {image_id} for doc {doc_id}: {str(e)}")
+            logging.error(f"Failed to get image with object_name {object_name}: {str(e)}")
             return None
 
-    def list_doc_images(self, doc_id: str) -> List[str]:
-        """List all images for a document.
+    def delete_image(self, image_id: str) -> bool:
+        """Delete an image from MinIO storage by image_id.
         
         Args:
-            doc_id: Document ID
-            
-        Returns:
-            List of image IDs
-        """
-        try:
-            prefix = f"{doc_id}/"
-            images = []
-            
-            # List all objects with prefix
-            objects = self.client.list_objects(
-                bucket_name=self.bucket_name,
-                prefix=prefix
-            )
-            
-            # Extract image IDs from object names
-            for obj in objects:
-                image_id = obj.object_name.split('/')[-1]
-                images.append(image_id)
-            
-            return images
-            
-        except Exception as e:
-            logging.error(f"Failed to list images for doc {doc_id}: {str(e)}")
-            return []
-
-    def delete_doc_images(self, doc_id: str) -> bool:
-        """Delete all images for a document.
-        
-        Args:
-            doc_id: Document ID
+            image_id: Image ID (used as object_name in MinIO)
             
         Returns:
             True if successful, False otherwise
         """
         try:
-            prefix = f"{doc_id}/"
-            
-            # List all objects to delete
-            objects = self.client.list_objects(
+            # Remove object from MinIO
+            self.client.remove_object(
                 bucket_name=self.bucket_name,
-                prefix=prefix
+                object_name=image_id
             )
-            
-            # Delete each object
-            for obj in objects:
-                self.client.remove_object(
-                    bucket_name=self.bucket_name,
-                    object_name=obj.object_name
-                )
-            
+            logging.info(f"Successfully deleted image with image_id: {image_id}")
             return True
             
+        except S3Error as e:
+            if e.code == 'NoSuchKey':
+                logging.warning(f"Image not found with image_id: {image_id}")
+            else:
+                logging.error(f"Failed to delete image with image_id {image_id}: {str(e)}")
+            return False
+            
         except Exception as e:
-            logging.error(f"Failed to delete images for doc {doc_id}: {str(e)}")
+            logging.error(f"Failed to delete image with image_id {image_id}: {str(e)}")
             return False 
