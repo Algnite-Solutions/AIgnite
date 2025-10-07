@@ -1,0 +1,112 @@
+# LitSearch TestBed Configuration
+# 用于LitSearch测试床的配置文件
+
+INDEX_SERVICE:
+  # 向量数据库配置
+  vector_db:
+    model_name: "GritLM/GritLM-7B"
+    vector_dim: 4096
+    db_path: "vector_db/litsearch_test_db"
+  
+  # 元数据数据库配置
+  metadata_db:
+    db_url: "postgresql://postgres:11111@localhost:5432/litsearch_test"
+    # 测试环境使用独立的测试数据库
+  
+  # MinIO配置（虽然LitSearch测试可能不需要，但为了兼容性保留）
+  minio_db:
+    endpoint: localhost:9081
+    access_key: XOrv2wfoWfPypp2zGIae
+    secret_key: k9agaJuX2ZidOtaBxdc9Q2Hz5GnNKncNBnEZIoK3
+    bucket_name: aignite-litsearch-test
+    secure: false
+
+# LitSearch特定配置
+LITSEARCH_TESTBED:
+  # 数据库加载配置
+  load_previous_db: false # 是否加载已存在的数据库，true=跳过数据索引，false=重新索引数据
+  
+  # 是否在测试前清理现有数据库
+  cleanup_before_test: true
+  
+  # 是否在测试后清理数据库
+  cleanup_after_test: true
+
+  # 数据集配置
+  dataset:
+    # 数据集名称
+    name: "princeton-nlp/LitSearch"
+    # 语料库配置
+    corpus_config: "corpus_clean"  # 或 "corpus_s2orc"
+    # 查询配置
+    query_config: "query"
+    # 数据采样大小（None表示使用全部数据）
+    sample_size: 100
+    # 是否启用数据采样
+    enable_sampling: true
+  
+  # 搜索策略配置
+  search_strategies:
+    # 向量搜索配置
+    vector:
+      enabled: true
+      similarity_cutoff: 0.2
+      top_k_multiplier: 2  # 获取更多候选结果
+    
+    # TF-IDF搜索配置
+    tfidf:
+      enabled: true
+      similarity_cutoff: 0.1
+      top_k_multiplier: 2
+    
+    # 混合搜索配置
+    #hybrid:
+    #  enabled: true
+    #  vector_weight: 0.7
+    #  tfidf_weight: 0.3
+    #  rerank_method: "reciprocal_rank"  # 或 "weighted_average"
+  
+  # 评估配置
+  evaluation:
+    # 评估指标
+    metrics: ["map", "precision@1", "precision@5", "precision@10", "recall@10", "ndcg@10"]
+    # 评估的k值列表
+    k_values: [1, 5, 10]
+    # 批处理大小
+    batch_size: 32
+    # 最大搜索结果数
+    max_results: 1000
+  
+  # 测试配置
+  test:
+    # 测试超时时间（秒）
+    timeout: 1800  # 30分钟
+    
+    # 是否保留测试结果
+    save_results: true
+    # 结果保存路径
+    results_path: "litsearch_test_results"
+
+# 日志配置
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  
+  # 日志文件配置
+  file:
+    enabled: true
+    path: "litsearch_testbed.log"
+    max_size: "10MB"
+    backup_count: 5
+  
+
+# 性能配置
+performance:
+  # 是否启用性能监控
+  enable_profiling: false
+  # 性能报告输出文件
+  profile_output: "litsearch_performance_report.prof"
+  # 内存使用监控
+  monitor_memory: true
+  # CPU使用监控
+  monitor_cpu: true

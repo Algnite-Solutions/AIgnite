@@ -8,6 +8,9 @@ import logging
 import os
 from dataclasses import dataclass
 from huggingface_hub import hf_hub_download
+import torch
+from transformers import AutoTokenizer, AutoModel
+from gritlm import GritLM
 
 # LangChain imports
 from langchain_community.vectorstores import FAISS
@@ -129,6 +132,115 @@ class BGEEmbeddings(Embeddings):
                 pass
             self.model = None
 
+class GritLMEmbeddings(Embeddings):
+    """GritLM embedding model wrapper for LangChain compatibility."""
+    
+    def __init__(self, model_name: str = 'GritLM/GritLM-7B', query_instruction: str = "Given a scientific paper title, retrieve the paper's abstract"):
+        """Initialize GritLM embeddings.
+        
+        Args:
+            model_name: Name of the GritLM model to use
+            query_instruction: Instruction to use for query embeddings
+        """
+        self.model_name = model_name
+        self.query_instruction = query_instruction
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
+        try:
+            # Initialize using GritLM official library
+            self.model = GritLM(model_name, torch_dtype="auto")
+            
+            # Set use_cache to False for better performance
+            try:
+                self.model.model.config.use_cache = False
+            except AttributeError:
+                self.model.config.use_cache = False
+                
+            logger.info(f"Successfully loaded GritLM model: {model_name}")
+        except Exception as e:
+            logger.error(f"Failed to load GritLM model {model_name}: {str(e)}")
+            raise
+        
+    def gritlm_instruction(self, instruction: str) -> str:
+        """Format instruction for GritLM.
+        
+        Args:
+            instruction: Instruction text
+            
+        Returns:
+            Formatted instruction string
+        """
+        return "<|user|>\n" + instruction + "\n<|embed|>\n" if instruction else "<|embed|>\n"
+    
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        """Embed a list of documents.
+        
+        Args:
+            texts: List of texts to embed
+            
+        Returns:
+            List of embedding vectors
+        """
+        try:
+            # Clean and normalize texts
+            cleaned_texts = [text.strip() for text in texts]
+            
+            # Get embeddings using GritLM's encode method with empty instruction for documents
+            embeddings = self.model.encode(cleaned_texts, instruction=self.gritlm_instruction(""))
+            
+            # Convert to numpy array for normalization
+            embeddings = np.array(embeddings, dtype=np.float32)
+            
+            # Normalize the vectors
+            faiss.normalize_L2(embeddings)
+            
+            # Convert to list of lists
+            return embeddings.tolist()
+            
+        except Exception as e:
+            logger.error(f"Failed to embed documents: {str(e)}")
+            raise
+    
+    def embed_query(self, text: str) -> List[float]:
+        """Embed a single query text.
+        
+        Args:
+            text: Text to embed
+            
+        Returns:
+            Embedding vector
+        """
+        try:
+            # Clean and normalize the text
+            text = text.strip()
+            
+            # Get embedding using GritLM's encode method with query instruction
+            embedding = self.model.encode([text], instruction=self.gritlm_instruction(self.query_instruction))[0]
+            
+            # Convert to numpy array for normalization
+            embedding = np.array(embedding, dtype=np.float32).reshape(1, -1)
+            
+            # Normalize the vector
+            faiss.normalize_L2(embedding)
+            
+            return embedding[0].tolist()
+            
+        except Exception as e:
+            logger.error(f"Failed to embed query: {str(e)}")
+            raise
+    
+    
+    def __del__(self):
+        """Cleanup method."""
+        if hasattr(self, 'model'):
+            try:
+                del self.model
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            except:
+                pass
+            self.model = None
+
 class VectorDB:
     """Vector database implementation using LangChain FAISS."""
     
@@ -151,7 +263,12 @@ class VectorDB:
         self.model_name = model_name
         
         # Initialize embedding model
-        self.embeddings = BGEEmbeddings(model_name)
+        if "bge" in model_name.lower():
+            self.embeddings = BGEEmbeddings(model_name)
+        elif "gritlm" in model_name.lower():
+            self.embeddings = GritLMEmbeddings(model_name)
+        else:
+            self.embeddings = FlagModel(model_name)
         print(self.db_path)
         print(f"Initialized embeddings")
         # Try to load existing database first
@@ -165,8 +282,12 @@ class VectorDB:
         else:
             logger.info("No existing vector database found, initializing new one")
             # Create directory for new database if it doesn't exist
-            os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-            print(f"Created directory for new vector database at {self.db_path}")
+            db_dir = os.path.dirname(self.db_path)
+            if db_dir:  # Only create directory if there's a directory path
+                os.makedirs(db_dir, exist_ok=True)
+                print(f"Created directory for new vector database at {db_dir}")
+            else:
+                print(f"Using current directory for vector database: {self.db_path}")
         
         # Initialize new FAISS index if loading failed or database doesn't exist
         self.faiss_store = FAISS.from_texts(
@@ -193,7 +314,9 @@ class VectorDB:
         """
         try:
             # Create directory if it doesn't exist
-            os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+            db_dir = os.path.dirname(self.db_path)
+            if db_dir:  # Only create directory if there's a directory path
+                os.makedirs(db_dir, exist_ok=True)
             
             # Save using LangChain FAISS save_local
             self.faiss_store.save_local(self.db_path, index_name="index")
@@ -495,12 +618,17 @@ class VectorDB:
             for doc, score in docs_with_scores:
                 entry = self._document_to_vector_entry(doc)
                 
-                results.append((entry, float(score)))
+                # Convert distance score to similarity score (higher = more similar)
+                # For L2 normalized vectors, the distance range is [0, 2]
+                # Linear conversion: similarity = 1 - distance/2
+                
+                
+                results.append((entry, score))
             
             print('result after filters:', len(results))
             
-            # Sort by similarity score (lower is better for distance)
-            results.sort(key=lambda x: x[1])
+            # Sort by similarity score (higher similarity first)
+            #results.sort(key=lambda x: x[1])
             
             # Return top k results
             return results[:top_k]

@@ -15,42 +15,42 @@ TestBed是一个统一的测试框架，专门为AIgnite项目设计，用于管
 AIgnite/test/testbed/
 ├── __init__.py                    # 包初始化
 ├── base_testbed.py               # 抽象基类
-├── paper_indexer_testbed.py      # PaperIndexer专用测试床
-├── run_paper_indexer_testbed.py  # 测试运行器
-├── configs/                      # 配置文件目录
-│   └── paper_indexer_testbed_config.yaml
 └── README.md                     # 本文档
+
+AIgnite/test/index/
+├── paper_indexer_testbed.py      # PaperIndexer专用测试床
+├── litsearch_testbed.py          # LitSearch专用测试床
+└── ...
+
+AIgnite/test/configs/
+├── paper_indexer_testbed_config.yaml  # PaperIndexer配置文件
+└── litsearch_testbed_config.yaml     # LitSearch配置文件
 ```
 
 ## 使用方法
 
-### 1. 使用TestBed运行器
+### 1. 直接运行测试床
 
 ```bash
-# 使用默认配置运行测试
-cd AIgnite/test/testbed
-python run_paper_indexer_testbed.py
+# 运行PaperIndexer测试床
+cd AIgnite/test/index
+python paper_indexer_testbed.py
 
-# 使用自定义配置文件
-python run_paper_indexer_testbed.py -c configs/custom_config.yaml
-
-# 设置日志级别并保存结果
-python run_paper_indexer_testbed.py -l DEBUG -o results.json
-
-# 静默运行（只显示最终结果）
-python run_paper_indexer_testbed.py -q
+# 运行LitSearch测试床
+cd AIgnite/test/index
+python litsearch_testbed.py
 ```
 
 ### 2. 在unittest中使用
 
 ```python
 import unittest
-from AIgnite.test.testbed.paper_indexer_testbed import PaperIndexerTestBed
+from test.index.paper_indexer_testbed import PaperIndexerTestBed
 
 class TestPaperIndexer(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        config_path = "configs/paper_indexer_testbed_config.yaml"
+        config_path = "/data3/guofang/AIgnite-Solutions/AIgnite/test/configs/paper_indexer_testbed_config.yaml"
         cls.testbed = PaperIndexerTestBed(config_path)
         cls.results = cls.testbed.execute()
     
@@ -62,10 +62,11 @@ class TestPaperIndexer(unittest.TestCase):
 ### 3. 直接使用TestBed
 
 ```python
-from AIgnite.test.testbed.paper_indexer_testbed import PaperIndexerTestBed
+from test.index.paper_indexer_testbed import PaperIndexerTestBed
 
 # 创建测试床实例
-testbed = PaperIndexerTestBed("configs/paper_indexer_testbed_config.yaml")
+config_path = "/data3/guofang/AIgnite-Solutions/AIgnite/test/configs/paper_indexer_testbed_config.yaml"
+testbed = PaperIndexerTestBed(config_path)
 
 # 执行测试
 results = testbed.execute()
@@ -79,7 +80,10 @@ for test_name, result in results.items():
 
 配置文件使用YAML格式，包含以下主要部分：
 
-- `database`: 数据库配置（向量数据库、元数据数据库）
+- `INDEX_SERVICE`: 服务配置
+  - `vector_db`: 向量数据库配置
+  - `metadata_db`: 元数据数据库配置
+  - `minio_db`: 图像数据库配置
 - `test`: 测试参数（批处理大小、结果数量等）
 - `logging`: 日志配置
 - `search`: 搜索参数
@@ -101,7 +105,7 @@ TestBed返回结构化的测试结果，每个测试包含：
 要创建新的测试床，继承`TestBed`基类并实现抽象方法：
 
 ```python
-from AIgnite.test.testbed.base_testbed import TestBed
+from test.testbed.base_testbed import TestBed
 
 class MyCustomTestBed(TestBed):
     def check_environment(self) -> Tuple[bool, str]:
@@ -120,6 +124,18 @@ class MyCustomTestBed(TestBed):
         # 实现测试执行逻辑
         pass
 ```
+
+## 可用的测试床
+
+### PaperIndexerTestBed
+- **位置**: `AIgnite/test/index/paper_indexer_testbed.py`
+- **配置**: `AIgnite/test/configs/paper_indexer_testbed_config.yaml`
+- **功能**: 测试PaperIndexer的完整功能，包括向量搜索、TF-IDF搜索、混合搜索、文档删除、图像存储等
+
+### LitSearchTestBed
+- **位置**: `AIgnite/test/index/litsearch_testbed.py`
+- **配置**: `AIgnite/test/configs/litsearch_testbed_config.yaml`
+- **功能**: 测试LitSearch数据集上的搜索性能，包括评估指标计算
 
 ## 注意事项
 
@@ -142,7 +158,14 @@ class MyCustomTestBed(TestBed):
 使用DEBUG日志级别获取详细信息：
 
 ```bash
-python run_paper_indexer_testbed.py -l DEBUG
+# 运行PaperIndexer测试床并查看详细日志
+cd AIgnite/test/index
+python paper_indexer_testbed.py
+
+# 或者修改配置文件中的日志级别为DEBUG
+# 在 paper_indexer_testbed_config.yaml 中设置:
+# logging:
+#   level: "DEBUG"
 ```
 
 这将显示详细的执行过程，帮助定位问题。

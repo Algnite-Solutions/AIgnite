@@ -107,8 +107,8 @@ class VectorSearchStrategy(SearchStrategy):
             #print('Within search strategy')
             results = []
             for entry, score in vector_results:
-                print(entry,score)
-                if score > strategy_cutoff:
+                #print(entry,score)
+                if score < strategy_cutoff:
                     continue
                 
                 
