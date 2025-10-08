@@ -41,7 +41,7 @@ LITSEARCH_TESTBED:
     # 查询配置
     query_config: "query"
     # 数据采样大小（None表示使用全部数据）
-    sample_size: 100
+    sample_size: 1000
     # 是否启用数据采样
     enable_sampling: true
   
@@ -50,7 +50,7 @@ LITSEARCH_TESTBED:
     # 向量搜索配置
     vector:
       enabled: true
-      similarity_cutoff: 0.2
+      similarity_cutoff: 1.5
       top_k_multiplier: 2  # 获取更多候选结果
     
     # TF-IDF搜索配置

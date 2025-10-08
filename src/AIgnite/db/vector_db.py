@@ -575,6 +575,31 @@ class VectorDB:
             logger.error(f"Failed to delete document {doc_id} from vector database: {str(e)}")
             return False
 
+    def get_all_doc_ids(self) -> List[str]:
+        """Get all unique document IDs from the vector database.
+        
+        Returns:
+            List of unique document IDs stored in the vector database
+        """
+        try:
+            if not hasattr(self.faiss_store, 'docstore') or not hasattr(self.faiss_store.docstore, '_dict'):
+                logger.warning("Vector database docstore not accessible")
+                return []
+            
+            # Extract unique doc_ids from docstore
+            doc_ids = set()
+            for doc in self.faiss_store.docstore._dict.values():
+                if hasattr(doc, 'metadata') and 'doc_id' in doc.metadata:
+                    doc_ids.add(doc.metadata['doc_id'])
+            
+            doc_ids_list = sorted(list(doc_ids))
+            logger.info(f"Retrieved {len(doc_ids_list)} unique document IDs from vector database")
+            return doc_ids_list
+            
+        except Exception as e:
+            logger.error(f"Failed to get all doc_ids from vector database: {str(e)}")
+            return []
+
     def search(
         self,
         query: str,

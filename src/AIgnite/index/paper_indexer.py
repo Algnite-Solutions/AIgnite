@@ -146,6 +146,7 @@ class PaperIndexer(BaseIndexer):
             Dictionary mapping doc_ids to their indexing status for each database type
         """
         indexing_status = {}
+        vector_add_results = {}  # 记录向量添加结果
         
         try:
             # Main progress bar for papers
@@ -190,20 +191,18 @@ class PaperIndexer(BaseIndexer):
                     try:
                         #text_chunks = [chunk.text for chunk in paper.text_chunks]
                         success = self.vector_db.add_document(
-                            vector_db_id=paper.doc_id+'_abstract',
-                            text_to_emb=paper.title+' . '+paper.abstract,
+                            vector_db_id=paper.doc_id + '_abstract',
+                            text_to_emb=paper.title + ' . ' + paper.abstract,
                             doc_metadata={"doc_id": paper.doc_id, "text_type": "abstract"}
                         )
+                        vector_add_results[paper.doc_id] = success  # 记录添加结果
                         paper_status["vectors"] = success
                         logger.debug(f"Added vectors for {paper.doc_id}: {success}")
                         
-                        if success:
-                            save_success = self.vector_db.save()
-                            if not save_success:
-                                logger.error(f"Failed to save vector database after adding {paper.doc_id}")
-                                paper_status["vectors"] = False
                     except Exception as e:
-                        logger.error(f"Failed to store vectors for {paper.doc_id}: {str(e)}")
+                        logger.error(f"Failed to add vectors for {paper.doc_id}: {str(e)}")
+                        vector_add_results[paper.doc_id] = False
+                        paper_status["vectors"] = False
                 
                 # Store images if database is available and paper has figures
                 if store_images and self.image_db is not None and paper.figure_chunks:
@@ -219,6 +218,28 @@ class PaperIndexer(BaseIndexer):
                         paper_status["images"] = False
                 
                 indexing_status[paper.doc_id] = paper_status
+            
+            # 所有论文处理完成后，统一保存向量数据库到磁盘
+            if self.vector_db is not None and vector_add_results:
+                try:
+                    logger.info(f"Saving vector database with {len(vector_add_results)} papers to disk...")
+                    save_success = self.vector_db.save()
+                    
+                    if not save_success:
+                        logger.error(f"Failed to save vector database after adding {len(papers)} papers")
+                        # 保存失败，更新所有论文的向量状态为 False
+                        for doc_id in vector_add_results.keys():
+                            if doc_id in indexing_status:
+                                indexing_status[doc_id]["vectors"] = False
+                    else:
+                        logger.info(f"Successfully saved vector database with {len(vector_add_results)} papers")
+                        
+                except Exception as e:
+                    logger.error(f"Failed to save vector database: {str(e)}")
+                    # 保存出错，更新所有论文的向量状态为 False
+                    for doc_id in vector_add_results.keys():
+                        if doc_id in indexing_status:
+                            indexing_status[doc_id]["vectors"] = False
                 
         except Exception as e:
             logger.error(f"Failed to index papers: {str(e)}")
@@ -226,22 +247,58 @@ class PaperIndexer(BaseIndexer):
         
         return indexing_status
 
-    def save_vectors(self, papers: List[DocSet],indexing_status: Dict[str, Dict[str, bool]]=None):
+    def save_vectors(self, papers: List[DocSet], indexing_status: Dict[str, Dict[str, bool]] = None):
+        """批量保存论文向量到向量数据库
+        
+        Args:
+            papers: 论文列表
+            indexing_status: 可选的索引状态字典
+            
+        Returns:
+            更新后的 indexing_status 字典
+        """
         try:
+            # 记录每篇论文的添加状态
+            add_results = {}
+            
+            # 循环添加所有论文到内存
             for paper in papers:
+
                 success = self.vector_db.add_document(
-                            vector_db_id=paper.doc_id+'_abstract',
-                            text_to_emb=paper.title+' . '+paper.abstract,
-                            doc_metadata={"doc_id": paper.doc_id, "text_type": "abstract"}
-                        )
-                logger.debug(f"Saved vectors for {paper.doc_id}: {success}")
+                    vector_db_id=paper.doc_id + '_abstract',
+                    text_to_emb=paper.title + ' . ' + paper.abstract,
+                    doc_metadata={"doc_id": paper.doc_id, "text_type": "abstract"}
+                )
+                if not success:
+                    logger.error(f"Failed to add vectors for {paper.doc_id}")
+                    add_results[paper.doc_id] = False
+                    continue
+                add_results[paper.doc_id] = success
+                logger.debug(f"Added vectors for {paper.doc_id}: {success}")
+            
+            # 统一保存到磁盘（所有论文处理完后只保存一次）
+            save_success = self.vector_db.save()
+            
+            if not save_success:
+                logger.error(f"Failed to save vector database after adding {len(papers)} papers")
+                # 如果保存失败，所有论文的向量状态都应该标记为失败
                 if indexing_status:
-                    indexing_status[paper.doc_id]["vectors"] = True
+                    for paper in papers:
+                        indexing_status[paper.doc_id]["vectors"] = False
+                return indexing_status
+            
+            # 保存成功，更新所有成功添加的论文状态
+            if indexing_status:
+                for paper in papers:
+                    # 只有添加成功且保存成功的才标记为 True
+                    indexing_status[paper.doc_id]["vectors"] = add_results.get(paper.doc_id, False)
+            
+            logger.info(f"Successfully saved vectors for {len(papers)} papers to disk")
+            return indexing_status
+            
         except Exception as e:
             logger.error(f"Failed to save vectors: {str(e)}")
             raise RuntimeError(f"Failed to save vectors: {str(e)}")
-            return False
-        return indexing_status
 
 
     def store_images(self, papers: List[DocSet], indexing_status: Dict[str, Dict[str, bool]] = None, keep_temp_image: bool = False):

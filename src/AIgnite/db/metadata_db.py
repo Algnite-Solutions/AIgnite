@@ -873,6 +873,24 @@ class MetadataDB:
         finally:
             session.close()
 
+    def get_all_doc_ids(self) -> List[str]:
+        """Get all document IDs from the metadata database.
+        
+        Returns:
+            List of all document IDs in the database
+        """
+        session = self.Session()
+        try:
+            papers = session.query(TableSchema.doc_id).all()
+            doc_ids = [paper.doc_id for paper in papers]
+            logger.info(f"Retrieved {len(doc_ids)} document IDs from metadata database")
+            return doc_ids
+        except Exception as e:
+            logger.error(f"Failed to get all doc_ids: {str(e)}")
+            return []
+        finally:
+            session.close()
+
     """
     def delete_figure_id(self, doc_id: str, figure_id: str) -> bool:
         '''

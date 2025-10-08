@@ -3,9 +3,16 @@ from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 from llama_index.core import VectorStoreIndex
 import logging
+import numpy as np
 
 # Set up logging
 logger = logging.getLogger(__name__)
+
+def to_python_type(value):
+    """Convert numpy types to Python native types for JSON serialization"""
+    if isinstance(value, (np.integer, np.floating)):
+        return value.item()
+    return value
 
 @dataclass
 class SearchResult:
@@ -107,16 +114,16 @@ class VectorSearchStrategy(SearchStrategy):
             #print('Within search strategy')
             results = []
             for entry, score in vector_results:
-                #print(entry,score)
-                if score < strategy_cutoff:
+                print(entry,score)
+                if score > strategy_cutoff:
                     continue
                 
                 
                 results.append(SearchResult(
                     doc_id=entry.doc_id,
-                    score=score,
+                    score=float(to_python_type(score)),
                     metadata={
-                        "vector_score": score,
+                        "vector_score": float(to_python_type(score)),
                         "text": entry.text,
                         "text_type": entry.text_type,
                         "chunk_id": entry.chunk_id
@@ -177,7 +184,7 @@ class TFIDFSearchStrategy(SearchStrategy):
             for result in search_results:
                 results.append(SearchResult(
                     doc_id=result['doc_id'],
-                    score=result['score'],
+                    score=float(to_python_type(result['score'])),
                     metadata=result['metadata'],
                     search_method='tf-idf',
                     matched_text=result['matched_text']
@@ -267,13 +274,15 @@ class HybridSearchStrategy(SearchStrategy):
             
             # 5. 创建重排序后的结果
             best_result = max(results, key=lambda x: x.score)
+            # Convert method_scores to Python native types
+            python_method_scores = {k: float(to_python_type(v)) for k, v in method_scores.items()}
             reranked_results.append(SearchResult(
                 doc_id=doc_id,
-                score=combined_score,
+                score=float(to_python_type(combined_score)),
                 metadata={
                     **best_result.metadata,
-                    "reranked_score": combined_score,
-                    "method_scores": method_scores
+                    "reranked_score": float(to_python_type(combined_score)),
+                    "method_scores": python_method_scores
                 },
                 search_method="hybrid_reranked",
                 matched_text=best_result.matched_text,
@@ -360,11 +369,11 @@ class HybridSearchStrategy(SearchStrategy):
                 if combined_score >= similarity_cutoff:
                     results.append(SearchResult(
                         doc_id=doc_id,
-                        score=combined_score,
+                        score=float(to_python_type(combined_score)),
                         metadata={
-                            "vector_score": vector_score,
-                            "tfidf_score": tfidf_score,
-                            "combined_score": combined_score,
+                            "vector_score": float(to_python_type(vector_score)),
+                            "tfidf_score": float(to_python_type(tfidf_score)),
+                            "combined_score": float(to_python_type(combined_score)),
                             **data.get("metadata", {})
                         },
                         search_method="hybrid",
