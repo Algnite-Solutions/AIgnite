@@ -16,6 +16,7 @@ import shutil
 from pathlib import Path
 import sys
 import os
+from sqlalchemy import create_engine
 
 # 添加PaperIgnition路径
 from test.index.config.config_loader import load_config
@@ -105,8 +106,12 @@ class TestBed(ABC):
         pass
     
     # 模板方法
-    def setup(self) -> None:
-        """设置测试环境"""
+    def setup(self, clean_before_test: bool = True) -> None:
+        """设置测试环境
+        
+        Args:
+            clean_before_test: 是否在测试前清理环境，默认为True
+        """
         self.logger.info(f"Setting up {self.__class__.__name__} test environment...")
         
         # 检查环境
@@ -115,6 +120,10 @@ class TestBed(ABC):
             raise RuntimeError(f"Environment check failed: {error_msg}")
         
         self.logger.info("Environment check passed")
+        
+        # 测试前清理（如果需要）
+        if clean_before_test:
+            self._cleanup_before_test()
         
         # 创建临时目录
         self.temp_dir = tempfile.mkdtemp()
@@ -144,16 +153,20 @@ class TestBed(ABC):
         
         self.logger.info("Test environment cleanup completed")
     
-    def execute(self) -> Dict[str, Any]:
+    def execute(self, clean_before_test: bool = True, clean_after_test: bool = True) -> Dict[str, Any]:
         """执行完整测试流程
         
+        Args:
+            clean_before_test: 是否在测试前清理环境，默认为True
+            clean_after_test: 是否在测试后清理环境，默认为True
+            
         Returns:
             测试结果字典
         """
         self.logger.info(f"Starting {self.__class__.__name__} test execution...")
         
         try:
-            self.setup()
+            self.setup(clean_before_test=clean_before_test)
             self.results = self.run_tests()
             self.logger.info("Test execution completed successfully")
             return self.results
@@ -161,6 +174,7 @@ class TestBed(ABC):
             self.logger.error(f"Test execution failed: {str(e)}")
             raise
         finally:
+         if clean_after_test:
             self.teardown()
     
     def _cleanup_databases(self) -> None:
@@ -186,7 +200,56 @@ class TestBed(ABC):
                 self.logger.info("Cleaned up metadata database tables")
             except Exception as e:
                 self.logger.warning(f"Failed to clean up metadata database: {str(e)}")
+
     
+    def _cleanup_before_test(self) -> None:
+        """测试前清理环境"""
+        self.logger.info("Cleaning up before test execution...")
+        
+        # 尝试从配置中直接清理数据库（避免依赖已初始化的对象）
+        try:
+            self._cleanup_databases_from_config()
+        except Exception as e:
+            self.logger.warning(f"Failed to clean databases from config: {str(e)}")
+            # 回退到原有清理逻辑（如果数据库对象已初始化）
+            self._cleanup_databases()
+        
+        self.logger.info("Pre-test cleanup completed")
+    
+    def _cleanup_databases_from_config(self) -> None:
+        """从配置中直接清理数据库（不依赖已初始化的对象）"""
+        self.logger.info("Cleaning up databases from configuration...")
+        
+        # 清理向量数据库文件
+        try:
+            if 'vector_db' in self.config and 'db_path' in self.config['vector_db']:
+                vector_db_path = self.config['vector_db']['db_path']
+                vector_db_dir = Path(vector_db_path).parent
+                if vector_db_dir.exists():
+                    shutil.rmtree(vector_db_dir, ignore_errors=True)
+                    self.logger.info(f"Cleaned up vector database directory: {vector_db_dir}")
+                else:
+                    self.logger.info(f"Vector database directory does not exist: {vector_db_dir}")
+            else:
+                self.logger.info("No vector database path found in config")
+        except Exception as e:
+            self.logger.warning(f"Failed to clean up vector database: {str(e)}")
+        
+        # 清理元数据数据库表
+        try:
+            if 'metadata_db' in self.config and 'db_url' in self.config['metadata_db']:
+                db_url = self.config['metadata_db']['db_url']
+                engine = create_engine(db_url)
+                
+                # 删除所有表
+                from AIgnite.db.metadata_db import Base
+                Base.metadata.drop_all(engine)
+                engine.dispose()
+                self.logger.info("Cleaned up metadata database tables")
+            else:
+                self.logger.info("No metadata database URL found in config")
+        except Exception as e:
+            self.logger.warning(f"Failed to clean up metadata database: {str(e)}")
 
     
     def log_test_result(self, test_name: str, success: bool, details: str = "") -> None:

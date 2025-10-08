@@ -12,7 +12,7 @@
 │   └── 构建metadata对象
 ├── 并行存储阶段
 │   ├── MetadataDB (PostgreSQL) - 元数据存储 + 全文内容存储
-│   ├── VectorDB (FAISS) - 向量存储
+│   ├── VectorDB (FAISS) - 向量存储（支持 BGE/GritLM 等多种嵌入模型）
 │   └── MinioImageDB (MinIO) - 图像存储
 └── 状态跟踪
     └── 返回索引状态报告
@@ -186,9 +186,47 @@ def delete_paper(self, doc_id: str) -> Tuple[bool, bool]:
 - 返回状态：分别返回元数据和文本块删除状态
 - 完整清理：删除所有关联数据，包括PDF、文本块、图片引用等
 
+**获取所有文档ID功能**
+```python
+def get_all_doc_ids(self) -> List[str]:
+    """Get all document IDs from the metadata database.
+    
+    Returns:
+        List of all document IDs in the database
+    """
+```
+
+**功能说明**
+- 查询papers表获取所有doc_id
+- 返回排序后的文档ID列表
+- 用于数据库一致性检查和差异识别
+
 #### VectorDB (FAISS) - 向量存储
 
 VectorDB 使用简化的存储接口，只需要三个参数：`vector_db_id`、`text_to_emb`、`doc_metadata`。`vector_db_id` 是向量数据库中的唯一标识符，用于索引内容（`text_to_emb`）；`doc_metadata` 是用于区分内容的附加信息。例如，文本块可能来自同一文档，它们共享一个 `doc_id` 但各自拥有独立的 `vector_db_id`。
+
+**嵌入模型支持**
+
+VectorDB 支持多种嵌入模型：
+- **BGE 模型**（如 `BAAI/bge-base-en-v1.5`）：通用文本嵌入模型
+- **GritLM 模型**（如 `GritLM/GritLM-7B`）：指令式嵌入模型，支持查询与文档的差异化处理
+
+**模型初始化示例**
+```python
+# 使用 BGE 模型
+vector_db = VectorDB(
+    db_path="./vector_index",
+    model_name='BAAI/bge-base-en-v1.5',
+    vector_dim=768
+)
+
+# 使用 GritLM 模型
+vector_db = VectorDB(
+    db_path="./vector_index",
+    model_name='GritLM/GritLM-7B',
+    vector_dim=4096  # GritLM-7B 的向量维度
+)
+```
 
 **存储条件**
 ```python
@@ -210,7 +248,7 @@ if self.vector_db is not None:
 # 存储论文摘要
 vector_db.add_document(
     vector_db_id=f"{paper.doc_id}_abstract",
-    text_to_emb=paper.abstract,
+    text_to_emb=paper.title+' . '+paper.abstract
     doc_metadata={"doc_id": paper.doc_id, "text_type": "abstract"}
 )
 
@@ -231,6 +269,76 @@ vector_db.add_document(
 )
 ```
 
+**向量存储场景设计**
+
+PaperIndexer 支持两种向量存储场景：
+
+1. **集成存储场景**：在 `index_papers` 方法中与元数据同时存储
+2. **独立存储场景**：通过 `save_vectors` 方法在元数据存储后单独存储向量
+
+**集成存储场景（index_papers）**
+```python
+# 在 index_papers 方法中
+if self.vector_db is not None:
+    success = self.vector_db.add_document(
+        vector_db_id=f"{paper.doc_id}_abstract",
+        text_to_emb=f"{paper.title} . {paper.abstract}",
+        doc_metadata={"doc_id": paper.doc_id, "text_type": "abstract"}
+    )
+```
+
+**独立存储场景（save_vectors）**
+```python
+def save_vectors(self, papers: List[DocSet], indexing_status: Dict[str, Dict[str, bool]] = None):
+    """Store vectors from papers to FAISS storage.
+    
+    Args:
+        papers: List of DocSet objects containing papers
+        indexing_status: Optional dictionary to track indexing status
+        
+    Returns:
+        indexing_status dictionary with updated vector storage status
+    """
+    for paper in papers:
+        success = self.vector_db.add_document(
+            vector_db_id=paper.doc_id+'_abstract',
+            text_to_emb=paper.title+' . '+paper.abstract,
+            doc_metadata={"doc_id": paper.doc_id, "text_type": "abstract"}
+        )
+```
+
+**向量存储逻辑设计**
+
+1. **双重存储场景支持**：
+   - `index_papers()`：集成存储，与元数据同时处理
+   - `save_vectors(papers, indexing_status)`：独立存储，元数据存储后单独处理向量
+
+2. **存储内容**：
+   - vector_db_id格式：`{doc_id}_abstract`
+   - 文本内容：`{title} . {abstract}`（标题+摘要组合）
+   - 元数据：`{"doc_id": doc_id, "text_type": "abstract"}`
+
+3. **存储状态管理**：
+   - 支持通过 `indexing_status` 参数跟踪向量存储状态
+   - 存储成功后更新 `indexing_status[doc_id]["vectors"] = True`
+
+4. **错误处理**：
+   - 完整的异常捕获和日志记录
+   - 抛出 `RuntimeError` 以便上层处理
+
+**使用场景示例**
+
+```python
+# 场景1：集成存储（推荐用于新论文索引）
+indexing_results = indexer.index_papers(papers)
+
+# 场景2：独立存储（用于元数据已存储的论文）
+# 先存储元数据
+indexing_results = indexer.index_papers(papers)
+# 后单独存储向量
+indexer.save_vectors(papers, indexing_results)
+```
+
 **向量条目结构**
 ```python
 @dataclass
@@ -241,6 +349,21 @@ class VectorEntry:
     chunk_id: Optional[str] = None # 文本块ID（仅用于chunk类型）
     vector: Optional[np.ndarray] = None  # 向量表示
 ```
+
+**获取所有文档ID功能**
+```python
+def get_all_doc_ids(self) -> List[str]:
+    """Get all unique document IDs from the vector database.
+    
+    Returns:
+        List of unique document IDs stored in the vector database
+    """
+```
+
+**功能说明**
+- 从 FAISS docstore 提取所有唯一的 doc_id
+- 自动去重并返回排序后的文档ID列表
+- 用于向量数据库一致性检查和与MetadataDB的差异比对
 
 #### MinioImageDB (MinIO) - 图像存储
 

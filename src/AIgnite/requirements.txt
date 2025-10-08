@@ -1,0 +1,39 @@
+pydantic==2.11.3
+llama-index
+llama-index-vector-stores-faiss
+sentence-transformers
+openai
+numpy==1.24.3
+faiss-gpu==1.7.2
+torch
+FlagEmbedding
+huggingface_hub
+langchain_community
+langchain_core
+beautifulsoup4
+lxml
+arxiv
+requests
+urllib3
+fastapi==0.115.12
+uvicorn==0.34.2
+starlette==0.46.2
+google-genai
+sqlalchemy>=1.4.0
+psycopg2-binary>=2.9.0
+# Testing dependencies
+pytest>=7.4.0
+pytest-cov>=4.1.0
+coverage>=7.3.0
+minio>=7.2.0  # MinIO client for Python
+Pillow>=10.0.0  # For image handling in tests
+google-genai                             
+google-generativeai    
+volcengine          
+aspose-pdf           
+PyPDF2           
+img2pdf                  
+Pillow          
+Spire.Pdf
+#EMBEDDING MODELS
+gritlm             
