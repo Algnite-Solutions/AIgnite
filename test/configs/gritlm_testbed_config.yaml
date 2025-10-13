@@ -1,0 +1,116 @@
+# GritLM TestBed Configuration
+# 用于GritLM测试床的配置文件
+
+# 数据库配置
+INDEX_SERVICE:
+  host: "http://localhost:8002"
+
+  vector_db:
+    model_name: "GritLM/GritLM-7B"
+    vector_dim: 4096
+    db_path: "vector_db/gritlm_test_db"
+
+  metadata_db:
+    db_url: "postgresql://postgres:11111@localhost:5432/paperignition_test"
+    # 测试环境使用独立的测试数据库
+  minio_db:
+    endpoint: localhost:9081
+    access_key: XOrv2wfoWfPypp2zGIae
+    secret_key: k9agaJuX2ZidOtaBxdc9Q2Hz5GnNKncNBnEZIoK3
+    bucket_name: aignite-litsearch-test
+    secure: false
+
+# 测试配置
+test:
+  # 批处理大小
+  batch_size: 32
+  
+  # 搜索结果数量
+  top_k: 10
+  
+  # 数据采样大小（None表示使用全部数据）
+  sample_size: null
+  
+  # 测试超时时间（秒）
+  timeout: 300
+
+# 日志配置
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  
+  # 日志文件配置
+  file:
+    enabled: true
+    path: "gritlm_testbed.log"
+    max_size: "10MB"
+    backup_count: 5
+
+# 搜索配置
+search:
+  # 向量搜索权重（用于混合搜索）
+  vector_weight: 0.7
+  
+  # TF-IDF搜索权重（用于混合搜索）
+  tfidf_weight: 0.3
+  
+  # 相似度阈值
+  similarity_threshold: 0.1
+  
+  # 最大搜索结果数
+  max_results: 1000
+
+# 测试数据配置
+test_data:
+  # 测试论文数量
+  num_papers: 4
+  
+  # 每个论文的文本块数量
+  chunks_per_paper: 3
+  
+  # 测试图片尺寸
+  image_size:
+    width: 200
+    height: 200
+
+# 环境配置
+environment:
+  # 临时目录前缀
+  temp_dir_prefix: "gritlm_test_"
+  
+  # 是否在测试后保留临时文件（用于调试）
+  keep_temp_files: false
+  
+  # 是否在测试前清理现有数据库
+  cleanup_before_test: true
+  
+  # 是否在测试后清理数据库
+  cleanup_after_test: true
+
+# 性能配置
+performance:
+  # 是否启用性能监控
+  enable_profiling: false
+  
+  # 性能报告输出文件
+  profile_output: "gritlm_performance_report.prof"
+  
+  # 内存使用监控
+  monitor_memory: true
+  
+  # CPU使用监控
+  monitor_cpu: true
+
+# GritLM 特定配置
+gritlm:
+  # 查询指令
+  query_instruction: "Given a scientific paper title, retrieve the paper's abstract"
+  
+  # 测试查询列表
+  test_queries:
+    - "automatic term extraction methods"
+    - "neural machine translation baselines"
+    - "BERT knowledge distillation"
+    - "computer vision deep learning"
+    - "transformer models"
+    - "natural language processing"

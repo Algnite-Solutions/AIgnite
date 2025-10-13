@@ -9,7 +9,7 @@ PaperIndexer专用测试床
 """
 #import sys
 #sys.path.append("/data3/guofang/AIgnite-Solutions/AIgnite/test/testbed")
-from test.testbed.base_testbed import TestBed
+from AIgnite.experiments.recommendation.testbed.base_testbed import TestBed
 from AIgnite.index.paper_indexer import PaperIndexer
 from AIgnite.data.docset import DocSet, TextChunk, FigureChunk, TableChunk, ChunkType
 from AIgnite.db.metadata_db import MetadataDB, Base
@@ -1262,7 +1262,7 @@ class PaperIndexerTestBed(TestBed):
 # python3 -m test.index.paper_indexer_testbed
 
 if __name__ == '__main__':
-    config_path = Path("/data3/guofang/AIgnite-Solutions/AIgnite/test/configs/paper_indexer_testbed_config.yaml")
+    config_path = Path("/data3/guofang/AIgnite-Solutions/AIgnite/test/configs/paper_indexer_testbed_config_gritlm.yaml")
     
     if not config_path.exists():
         print(f"Error: Configuration file not found: {config_path}")
@@ -1273,4 +1273,12 @@ if __name__ == '__main__':
     logger.info("Initializing PaperIndexer TestBed...")
     testbed = PaperIndexerTestBed(str(config_path))
     #print(testbed.config)
-    testbed.execute()           # 这会调用 check_environment(), 创建 temp_dir, load_data(), initialize_databases(), run_tests()
+    
+    # 从配置文件中读取清理设置
+    cleanup_before_test = testbed.config.get('environment', {}).get('cleanup_before_test', True)
+    cleanup_after_test = testbed.config.get('environment', {}).get('cleanup_after_test', True)
+
+    print(f"清理设置: 清理前={cleanup_before_test}, 清理后={cleanup_after_test}")
+    
+    # 执行测试，使用配置文件中的清理设置
+    testbed.execute(clean_before_test=cleanup_before_test, clean_after_test=cleanup_after_test)

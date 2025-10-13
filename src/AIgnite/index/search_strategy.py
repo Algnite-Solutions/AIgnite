@@ -3,9 +3,16 @@ from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 from llama_index.core import VectorStoreIndex
 import logging
+import numpy as np
 
 # Set up logging
 logger = logging.getLogger(__name__)
+
+def to_python_type(value):
+    """Convert numpy types to Python native types for JSON serialization"""
+    if isinstance(value, (np.integer, np.floating)):
+        return value.item()
+    return value
 
 @dataclass
 class SearchResult:
@@ -97,7 +104,7 @@ class VectorSearchStrategy(SearchStrategy):
                 #print('IN VECTOR SEARCH STRATEGY')
                 strategy_results = strategy.search(
                     query=query, 
-                    top_k=top_k * 2,  # 获取更多候选结果 # 获取更多候选结果
+                    top_k=top_k,  # 获取更多候选结果 # 获取更多候选结果
                     filters=filters,  # 使用策略特定的相似度阈值
                 )
                 vector_results.extend(strategy_results)
@@ -114,9 +121,9 @@ class VectorSearchStrategy(SearchStrategy):
                 
                 results.append(SearchResult(
                     doc_id=entry.doc_id,
-                    score=score,
+                    score=float(to_python_type(score)),
                     metadata={
-                        "vector_score": score,
+                        "vector_score": float(to_python_type(score)),
                         "text": entry.text,
                         "text_type": entry.text_type,
                         "chunk_id": entry.chunk_id
@@ -157,7 +164,7 @@ class TFIDFSearchStrategy(SearchStrategy):
             for strategy, strategy_cutoff in self.search_strategies:
                 strategy_results = strategy.search(
                     query=query, 
-                    top_k=top_k * 2,  # 获取更多候选结果
+                    top_k=top_k,  # 获取更多候选结果
                     filters=filters, 
                     similarity_cutoff=strategy_cutoff  # 使用策略特定的相似度阈值
                 )
@@ -177,7 +184,7 @@ class TFIDFSearchStrategy(SearchStrategy):
             for result in search_results:
                 results.append(SearchResult(
                     doc_id=result['doc_id'],
-                    score=result['score'],
+                    score=float(to_python_type(result['score'])),
                     metadata=result['metadata'],
                     search_method='tf-idf',
                     matched_text=result['matched_text']
@@ -227,7 +234,7 @@ class HybridSearchStrategy(SearchStrategy):
         for strategy, strategy_cutoff in self.search_strategies:
             strategy_results = strategy.search(
                 query, 
-                top_k * 2,  # 获取更多候选结果
+                top_k,  # 获取更多候选结果
                 filters, 
                 strategy_cutoff  # 使用策略特定的相似度阈值
             )
@@ -267,13 +274,15 @@ class HybridSearchStrategy(SearchStrategy):
             
             # 5. 创建重排序后的结果
             best_result = max(results, key=lambda x: x.score)
+            # Convert method_scores to Python native types
+            python_method_scores = {k: float(to_python_type(v)) for k, v in method_scores.items()}
             reranked_results.append(SearchResult(
                 doc_id=doc_id,
-                score=combined_score,
+                score=float(to_python_type(combined_score)),
                 metadata={
                     **best_result.metadata,
-                    "reranked_score": combined_score,
-                    "method_scores": method_scores
+                    "reranked_score": float(to_python_type(combined_score)),
+                    "method_scores": python_method_scores
                 },
                 search_method="hybrid_reranked",
                 matched_text=best_result.matched_text,
@@ -360,11 +369,11 @@ class HybridSearchStrategy(SearchStrategy):
                 if combined_score >= similarity_cutoff:
                     results.append(SearchResult(
                         doc_id=doc_id,
-                        score=combined_score,
+                        score=float(to_python_type(combined_score)),
                         metadata={
-                            "vector_score": vector_score,
-                            "tfidf_score": tfidf_score,
-                            "combined_score": combined_score,
+                            "vector_score": float(to_python_type(vector_score)),
+                            "tfidf_score": float(to_python_type(tfidf_score)),
+                            "combined_score": float(to_python_type(combined_score)),
                             **data.get("metadata", {})
                         },
                         search_method="hybrid",
