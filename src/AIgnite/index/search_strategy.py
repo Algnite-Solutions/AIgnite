@@ -104,7 +104,7 @@ class VectorSearchStrategy(SearchStrategy):
                 #print('IN VECTOR SEARCH STRATEGY')
                 strategy_results = strategy.search(
                     query=query, 
-                    top_k=top_k * 2,  # 获取更多候选结果 # 获取更多候选结果
+                    top_k=top_k,  # 获取更多候选结果 # 获取更多候选结果
                     filters=filters,  # 使用策略特定的相似度阈值
                 )
                 vector_results.extend(strategy_results)
@@ -164,7 +164,7 @@ class TFIDFSearchStrategy(SearchStrategy):
             for strategy, strategy_cutoff in self.search_strategies:
                 strategy_results = strategy.search(
                     query=query, 
-                    top_k=top_k * 2,  # 获取更多候选结果
+                    top_k=top_k,  # 获取更多候选结果
                     filters=filters, 
                     similarity_cutoff=strategy_cutoff  # 使用策略特定的相似度阈值
                 )
@@ -234,7 +234,7 @@ class HybridSearchStrategy(SearchStrategy):
         for strategy, strategy_cutoff in self.search_strategies:
             strategy_results = strategy.search(
                 query, 
-                top_k * 2,  # 获取更多候选结果
+                top_k,  # 获取更多候选结果
                 filters, 
                 strategy_cutoff  # 使用策略特定的相似度阈值
             )

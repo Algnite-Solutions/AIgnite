@@ -9,7 +9,7 @@ PaperIndexer专用测试床
 """
 #import sys
 #sys.path.append("/data3/guofang/AIgnite-Solutions/AIgnite/test/testbed")
-from experiments.recommendation.testbed.base_testbed import TestBed
+from AIgnite.experiments.recommendation.testbed.base_testbed import TestBed
 from AIgnite.index.paper_indexer import PaperIndexer
 from AIgnite.data.docset import DocSet, TextChunk, FigureChunk, TableChunk, ChunkType
 from AIgnite.db.metadata_db import MetadataDB, Base

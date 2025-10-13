@@ -8,7 +8,7 @@ GritLM专用测试床
 使用test_gritlm.py中的4篇真实文章进行测试。
 """
 
-from recommendation.testbed.base_testbed import TestBed
+from AIgnite.experiments.recommendation.testbed.base_testbed import TestBed
 from AIgnite.index.paper_indexer import PaperIndexer
 from AIgnite.data.docset import DocSet, TextChunk, ChunkType
 from AIgnite.db.metadata_db import MetadataDB, Base

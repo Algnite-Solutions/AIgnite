@@ -19,7 +19,7 @@ import os
 from sqlalchemy import create_engine
 
 # 添加PaperIgnition路径
-from test.index.config.config_loader import load_config
+from AIgnite.test.index.config.config_loader import load_config
 
 
 class TestBed(ABC):

@@ -8,8 +8,8 @@ LitSearchTestBed专用测试床
 使用真实数据库（VectorDB, MetadataDB）进行完整的集成测试。
 """
 
-from experiments.recommendation.testbed.base_testbed import TestBed
-from experiments.recommendation.testbed.litsearch_eval.evaluator import SearchEvaluator
+from AIgnite.experiments.recommendation.testbed.base_testbed import TestBed
+from AIgnite.experiments.recommendation.testbed.litsearch_eval.evaluator import SearchEvaluator
 from AIgnite.data.docset import DocSet, TextChunk, ChunkType
 from AIgnite.db.metadata_db import MetadataDB, Base
 from AIgnite.db.vector_db import VectorDB
