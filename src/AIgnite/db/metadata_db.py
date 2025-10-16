@@ -650,8 +650,16 @@ class MetadataDB:
         try:
             from ..index.filter_parser import FilterParser
             filter_parser = FilterParser()
-            filter_where, filter_params = filter_parser.get_sql_conditions(filters)
-            
+            logger.debug(f"get_filtered_doc_ids: Raw filters = {filters}")
+            parsed_filters = filter_parser.parse_filters(filters)
+            logger.debug(f"get_filtered_doc_ids: Parsed filters = {parsed_filters}")
+            if not parsed_filters:
+                logger.warning("Filters parsed to None, returning empty list")
+                return []
+            filter_where, filter_params = filter_parser.get_sql_conditions(parsed_filters)
+            #print('FILTER WHERE: ', filter_where)
+            #print('FILTER PARAMS: ', filter_params)
+
             if filter_where == "1=1":
                 return []
             
