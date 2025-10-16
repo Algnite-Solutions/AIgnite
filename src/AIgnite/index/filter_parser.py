@@ -1,6 +1,7 @@
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 import logging
+from datetime import timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -117,13 +118,16 @@ class FilterParser:
                 return None
         elif isinstance(value, list) and len(value) == 2:
             # Date range
+            #print('VALIDATE DATE RANGE: ', value)
             try:
                 start_date = datetime.fromisoformat(value[0])
                 end_date = datetime.fromisoformat(value[1])
+                end_date = end_date + timedelta(days=1)
+                #print('END DATE: ', end_date.isoformat())
                 if start_date > end_date:
                     logger.error(f"Start date {value[0]} is after end date {value[1]}")
                     return None
-                return {"range": [value[0], value[1]]}
+                return {"range": [value[0], end_date.isoformat()]}
             except (ValueError, IndexError):
                 logger.error(f"Invalid date range format: {value}")
                 return None
@@ -215,7 +219,8 @@ class FilterParser:
             elif field == "published_date":
                 if "range" in value:
                     start_date, end_date = value["range"]
-                    conditions.append("published_date BETWEEN :filter_start_date AND :filter_end_date")
+                    # Use explicit >= and <= for closed interval (inclusive of both boundaries)
+                    conditions.append("published_date >= :filter_start_date AND published_date <= :filter_end_date")
                     params["filter_start_date"] = start_date
                     params["filter_end_date"] = end_date
                 elif "exact" in value:
@@ -252,7 +257,8 @@ class FilterParser:
             elif field == "published_date":
                 if "range" in value:
                     start_date, end_date = value["range"]
-                    conditions.append("(published_date < :filter_exclude_start_date OR published_date > :filter_exclude_end_date)")
+                    # Exclude closed interval: NOT (date >= start AND date <= end)
+                    conditions.append("NOT (published_date >= :filter_exclude_start_date AND published_date <= :filter_exclude_end_date)")
                     params["filter_exclude_start_date"] = start_date
                     params["filter_exclude_end_date"] = end_date
                 elif "exact" in value:

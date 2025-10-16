@@ -17,16 +17,19 @@
 └── 状态跟踪
     └── 返回索引状态报告
 
-数据检索架构（重构后）
-├── 搜索策略模块 (SearchStrategy)
-│   ├── VectorSearchStrategy - 向量搜索（策略组合模式）
-│   ├── TFIDFSearchStrategy - TF-IDF搜索（策略组合模式）
+数据检索架构（重构后 - 两阶段过滤）
+├── PaperIndexer 过滤层（第一阶段：预过滤）
+│   └── 使用 MetadataDB.get_filtered_doc_ids() 处理复杂过滤条件
+│       └── 将候选 doc_ids 转换为简化格式传递给搜索策略
+├── 搜索策略模块 (SearchStrategy)（第二阶段：简化过滤）
+│   ├── VectorSearchStrategy - 向量搜索（仅接收 doc_ids 过滤）
+│   ├── TFIDFSearchStrategy - TF-IDF搜索（仅接收 doc_ids 过滤）
 │   └── HybridSearchStrategy - 混合搜索（倒数排名重排序）
 ├── 过滤器模块 (FilterParser)
 │   ├── 字段验证和解析
-│   ├── SQL条件生成
-│   └── 内存过滤应用
-└── 结果合并模块 (CombineStrategy) - 新增
+│   ├── SQL条件生成（用于MetadataDB预过滤）
+│   └── 内存过滤应用（用于简化的doc_ids过滤）
+└── 结果合并模块 (CombineStrategy)
     ├── DataRetriever - 数据获取接口
     └── ResultCombiner - 结果合并器
 ```
@@ -527,7 +530,52 @@ paper_status = {
 
 ## 数据检索架构详解
 
-数据检索发生在PaperIndexer的find_similar_papers方法中，其基本输入为查询字符串query、结果数量top_k、过滤条件filters、搜索策略列表search_strategies和返回数据类型result_include_types。该方法通过四步流程实现：1)执行搜索获取候选文档，2)提取文档ID，3)根据指定类型获取详细数据，4)合并搜索结果并返回结构化数据。
+数据检索发生在PaperIndexer的find_similar_papers方法中，其基本输入为查询字符串query、结果数量top_k、过滤条件filters、搜索策略列表search_strategies和返回数据类型result_include_types。
+
+### 两阶段过滤架构
+
+系统采用两阶段过滤架构，将复杂的过滤逻辑与搜索逻辑解耦：
+
+**第一阶段：预过滤（PaperIndexer层）**
+- 接收用户提供的完整过滤条件（包括categories、authors、published_date、title_keywords等）
+- 使用 `metadata_db.get_filtered_doc_ids(filters)` 在数据库层面执行SQL过滤
+- 获取符合条件的候选文档ID列表
+- 将结果转换为简化格式：`{"include": {"doc_ids": candidate_doc_ids}}`
+
+**第二阶段：简化过滤（SearchStrategy层）**
+- 搜索策略只接收简化的doc_ids过滤条件
+- VectorDB和MetadataDB的搜索方法只需处理doc_ids白名单
+- 避免在搜索层重复复杂的过滤逻辑
+
+**架构优势**：
+- **职责分离**：MetadataDB负责复杂过滤，SearchStrategy专注于搜索
+- **性能优化**：利用数据库索引进行高效过滤，减少搜索空间
+- **代码简化**：搜索策略不需要理解复杂的过滤语法
+- **灵活性**：可以轻松添加新的过滤字段，无需修改搜索策略
+
+### find_similar_papers 执行流程
+
+该方法通过以下流程实现完整的检索功能：
+
+1. **预过滤阶段**（如果提供了filters）
+   - 调用 `metadata_db.get_filtered_doc_ids(filters)` 获取候选doc_ids
+   - 如果没有候选文档，直接返回空结果
+   - 将候选doc_ids转换为简化格式：`{"include": {"doc_ids": candidate_doc_ids}}`
+
+2. **搜索执行阶段**
+   - 调用 `_execute_search(query, top_k, simplified_filters, search_strategies)`
+   - 搜索策略仅需处理简化的doc_ids过滤
+   - 返回搜索结果列表
+
+3. **文档ID提取阶段**
+   - 从搜索结果中提取doc_ids
+
+4. **数据获取阶段**
+   - 根据 `result_include_types` 调用 `DataRetriever` 获取相应数据
+
+5. **结果合并阶段**
+   - 使用 `ResultCombiner` 将搜索结果与获取的数据合并
+   - 返回结构化的完整结果
 
 ### PaperIndexer 搜索策略设置
 
@@ -571,7 +619,25 @@ def set_search_strategy(self, search_strategies: List[Tuple[SearchStrategy, floa
 
 #### VectorSearchStrategy - 向量搜索
 
-在向量搜索的SearchStrategy中，可以传入filters，目前支持的key为docids，格式为 "filters={"doc_ids": ["001", "004"]}"
+**过滤器说明（两阶段过滤架构）**
+
+在两阶段过滤架构下，VectorSearchStrategy 只接收简化的 doc_ids 过滤条件：
+
+```python
+# VectorSearchStrategy 接收的简化过滤格式
+filters = {
+    "include": {
+        "doc_ids": ["doc1", "doc2", "doc3"]  # 由 PaperIndexer 预过滤后的候选文档ID列表
+    }
+}
+```
+
+**注意**：
+- 用户在调用 `find_similar_papers` 时可以提供复杂的过滤条件
+- PaperIndexer 会在第一阶段通过 MetadataDB 处理所有复杂过滤（categories、authors等）
+- VectorSearchStrategy 在第二阶段只需处理预过滤后的 doc_ids 白名单
+- 这种设计将复杂过滤逻辑集中在数据库层，简化了向量搜索的实现
+
 ```python
 class VectorSearchStrategy(SearchStrategy):
     def __init__(self, search_strategies):
@@ -585,29 +651,32 @@ class VectorSearchStrategy(SearchStrategy):
 
     def search(self, query: str, top_k: int, filters: Optional[Dict[str, Any]] = None, 
                similarity_cutoff: float = 0.5, **kwargs):
+        # filters 参数仅包含简化的 doc_ids 过滤条件
         # 调用内部策略列表进行搜索
         for strategy, strategy_cutoff in self.search_strategies:
             strategy_results = strategy.search(query, top_k * 2, filters, strategy_cutoff)
         # 过滤结果并转换为标准格式
 ```
+#### TFIDFSearchStrategy - TF-IDF搜索
 
+**过滤器说明（两阶段过滤架构）**
 
-在基于关键词的SearchStrategy中，可以传入filters，目前支持的key为：`categories`、`authors`、`published_date`、`doc_ids`、`title_keywords`、`abstract_keywords`、`text_type`，格式为：
+与 VectorSearchStrategy 相同，TFIDFSearchStrategy 也只接收简化的 doc_ids 过滤条件：
+
 ```python
-{
+# TFIDFSearchStrategy 接收的简化过滤格式
+filters = {
     "include": {
-        "categories": ["cs.AI", "cs.LG"],           # 分类过滤，支持多个分类
-        "doc_ids": ["doc1", "doc2"],                # 特定文档ID过滤
-        "text_type": ["abstract", "chunk"]          # 文本类型过滤：abstract/chunk/combined
-    },
-    "exclude": {
-        "categories": ["cs.CR"],                    # 排除特定分类
-        "authors": ["Bob Wilson"],                  # 排除特定作者
-        "text_type": ["chunk"]                      # 排除特定文本类型
+        "doc_ids": ["doc1", "doc2", "doc3"]  # 由 PaperIndexer 预过滤后的候选文档ID列表
     }
 }
 ```
-#### TFIDFSearchStrategy - TF-IDF搜索
+
+**注意**：
+- MetadataDB 在第一阶段已经处理了所有复杂过滤条件
+- TFIDFSearchStrategy 在候选文档中执行全文搜索
+- 统一的两阶段过滤架构确保向量搜索和TF-IDF搜索使用相同的过滤逻辑
+
 ```python
 class TFIDFSearchStrategy(SearchStrategy):
     def __init__(self, search_strategies):
@@ -621,16 +690,33 @@ class TFIDFSearchStrategy(SearchStrategy):
 
     def search(self, query: str, top_k: int, filters: Optional[Dict[str, Any]] = None, 
                similarity_cutoff: float = 0.1, **kwargs):
+        # filters 参数仅包含简化的 doc_ids 过滤条件
         # 调用内部策略列表进行搜索
         for strategy, strategy_cutoff in self.search_strategies:
             strategy_results = strategy.search(query, top_k * 2, filters, strategy_cutoff)
 ```
 
-在基于混合检索的SearchStrategy中，可以传入filters，filters会被传入向量检索和关键词检索中
-
 #### HybridSearchStrategy - 混合搜索
 
 混合搜索策略支持多个搜索策略的组合，通过倒数排名重排序机制优化搜索结果。
+
+**过滤器说明（两阶段过滤架构）**
+
+HybridSearchStrategy 将简化的 doc_ids 过滤条件传递给所有子策略：
+
+```python
+# HybridSearchStrategy 接收并传递简化过滤格式
+filters = {
+    "include": {
+        "doc_ids": ["doc1", "doc2", "doc3"]  # 传递给所有子策略（Vector和TF-IDF）
+    }
+}
+```
+
+**注意**：
+- 混合搜索会将简化的过滤条件分别传递给向量搜索和TF-IDF搜索
+- 确保两种搜索方法在相同的候选文档集合上执行
+- 倒数排名重排序在预过滤后的候选集上进行
 
 **初始化设计**
 ```python

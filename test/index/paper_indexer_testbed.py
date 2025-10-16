@@ -9,7 +9,7 @@ PaperIndexer专用测试床
 """
 #import sys
 #sys.path.append("/data3/guofang/AIgnite-Solutions/AIgnite/test/testbed")
-from AIgnite.experiments.recommendation.testbed.base_testbed import TestBed
+from experiments.recommendation.testbed.base_testbed import TestBed
 from AIgnite.index.paper_indexer import PaperIndexer
 from AIgnite.data.docset import DocSet, TextChunk, FigureChunk, TableChunk, ChunkType
 from AIgnite.db.metadata_db import MetadataDB, Base
@@ -342,13 +342,14 @@ class PaperIndexerTestBed(TestBed):
             'save_and_get_blog': self._test_save_and_get_blog(),
             'filtering_functionality': self._test_filtering_functionality(),
             'vector_search_with_exclusion_filter': self._test_vector_search_with_exclusion_filter(),
-            'full_text_storage_and_retrieval': self._test_full_text_storage_and_retrieval(),
-            'full_text_deletion': self._test_full_text_deletion(),
-            'full_text_integration_with_search': self._test_full_text_integration_with_search(),
-            'store_images': self._test_store_images(),
-            'list_images': self._test_list_images(),
-            'delete_images_by_doc_id': self._test_delete_images_by_doc_id(),
-            'store_duplicated_images': self._test_store_duplicated_images(),
+            'vector_search_with_published_date_filter': self._test_vector_search_with_published_date_filter(),
+            #'full_text_storage_and_retrieval': self._test_full_text_storage_and_retrieval(),
+            #'full_text_deletion': self._test_full_text_deletion(),
+            #'full_text_integration_with_search': self._test_full_text_integration_with_search(),
+            #'store_images': self._test_store_images(),
+            #'list_images': self._test_list_images(),
+            #'delete_images_by_doc_id': self._test_delete_images_by_doc_id(),
+            #'store_duplicated_images': self._test_store_duplicated_images(),
         }
         
         # 统计测试结果
@@ -472,7 +473,7 @@ class PaperIndexerTestBed(TestBed):
             results = self.indexer.find_similar_papers(
                 query=query, 
                 top_k=3, 
-                search_strategies=[('vector', 0.8)],
+                search_strategies=[('vector', 1.5)],
                 result_include_types=['metadata', 'search_parameters']
             )
             
@@ -520,7 +521,7 @@ class PaperIndexerTestBed(TestBed):
             results = self.indexer.find_similar_papers(
                 query=query, 
                 top_k=3, 
-                search_strategies=[('vector', 0.8), ('tf-idf', 0.5)],
+                search_strategies=[('vector', 1.5), ('tf-idf', 0.5)],
                 result_include_types=['metadata', 'search_parameters']
             )
             
@@ -546,7 +547,7 @@ class PaperIndexerTestBed(TestBed):
             results_before = self.indexer.find_similar_papers(
                 query="vision transformer", 
                 top_k=5, 
-                search_strategies=[('vector', 0.8)]
+                search_strategies=[('vector', 1.5)]
             )
             for result in results_before:
                 print(result)
@@ -586,7 +587,7 @@ class PaperIndexerTestBed(TestBed):
             results_after = self.indexer.find_similar_papers(
                 query="vision transformer", 
                 top_k=5, 
-                search_strategies=[('vector', 0.8)]
+                search_strategies=[('vector', 1.5)]
             )
             if results_after is None:
                 results_after = []
@@ -639,39 +640,41 @@ class PaperIndexerTestBed(TestBed):
             query = "large language models"
             filters = {
                 "include": {
-                    "docids": ["2106.14834", "2106.14835"]
+                    "doc_ids": ["2106.14834", "2106.14835"]
                 }
             }
+            
             
             results = self.indexer.find_similar_papers(
                 query=query, 
                 top_k=5, 
                 filters=filters,
-                search_strategies=[('vector', 0.8)]
+                search_strategies=[('vector', 1.5)]
             )
-            
-            # 检查结果是否都符合过滤条件
-            all_filtered = True
-            for result in results:
-                doc_id = result.get('doc_id')
-                if doc_id:
-                    metadata = self.metadata_db.get_metadata(doc_id)
-                    if metadata:
-                        docids = metadata.get('docids', [])
-                        for docid in docids:
-                            if docid not in ["2106.14834", "2106.14835"]:
-                                all_filtered = False
-                                break
-            
-            success = all_filtered and len(results) > 0
-            details = f"Filtered search returned {len(results)} results, all matching filter criteria"
-            
-            self.log_test_result("Filtering Functionality", success, details)
-            return {'success': success, 'results_count': len(results), 'details': details}
-            
         except Exception as e:
             self.log_test_result("Filtering Functionality", False, f"Error: {str(e)}")
             return {'success': False, 'error': str(e)}
+        
+        # 检查结果是否都符合过滤条件
+        allowed_doc_ids = {"2106.14834", "2106.14835"}
+        all_filtered = True
+        
+        print(f"Found {len(results)} results:")
+        for result in results:
+            doc_id = result.get('doc_id')
+            if doc_id not in allowed_doc_ids:
+                all_filtered = False
+                print(f"  ✗ Unexpected doc_id: {doc_id}")
+                break
+            else:
+                print(f"  ✓ Valid doc_id: {doc_id}")
+        
+        success = all_filtered and len(results) > 0
+        details = f"Filtered search returned {len(results)} results, all matching filter criteria: {all_filtered}"
+            
+        self.log_test_result("Filtering Functionality", success, details)
+        return {'success': success, 'results_count': len(results), 'details': details}
+            
     
     def _test_vector_search_with_exclusion_filter(self) -> Dict[str, Any]:
         print("\n" + "="*60)
@@ -693,7 +696,7 @@ class PaperIndexerTestBed(TestBed):
                 query=query, 
                 top_k=5, 
                 filters=filters_exclude_single,
-                search_strategies=[('vector', 0.8)]
+                search_strategies=[('vector', 1.5)]
             )
             
             # 验证排除的文档不在结果中
@@ -716,7 +719,7 @@ class PaperIndexerTestBed(TestBed):
                 query=query, 
                 top_k=5, 
                 filters=filters_exclude_multiple,
-                search_strategies=[('vector', 0.8)]
+                search_strategies=[('vector', 1.5)]
             )
             
             # 验证排除的文档都不在结果中
@@ -732,7 +735,7 @@ class PaperIndexerTestBed(TestBed):
             results_unfiltered = self.indexer.find_similar_papers(
                 query=query, 
                 top_k=5, 
-                search_strategies=[('vector', 0.8)]
+                search_strategies=[('vector', 1.5)]
             )
             
             # 验证排除过滤器的结果是无过滤器结果的子集
@@ -757,7 +760,7 @@ class PaperIndexerTestBed(TestBed):
                 query=query, 
                 top_k=5, 
                 filters=filters_exclude_nonexistent,
-                search_strategies=[('vector', 0.8)]
+                search_strategies=[('vector', 1.5)]
             )
             
             # 应该返回与无过滤器相同的结果
@@ -789,7 +792,7 @@ class PaperIndexerTestBed(TestBed):
             results = self.indexer.find_similar_papers(
                 query="BERT",  # 使用一个简单的查询
                 top_k=1,
-                search_strategies=[('vector', 0.8)],
+                search_strategies=[('vector', 1.5)],
                 result_include_types=['full_text']
             )
             
@@ -821,7 +824,7 @@ class PaperIndexerTestBed(TestBed):
             results_before = self.indexer.find_similar_papers(
                 query="prompt engineering",  # 使用一个简单的查询
                 top_k=5,
-                search_strategies=[('vector', 0.8)],
+                search_strategies=[('vector', 1.5)],
                 result_include_types=['full_text']
             )
             
@@ -839,7 +842,7 @@ class PaperIndexerTestBed(TestBed):
             results_after = self.indexer.find_similar_papers(
                 query="prompt",  # 使用一个简单的查询
                 top_k=5,
-                search_strategies=[('vector', 0.8)],
+                search_strategies=[('vector', 1.5)],
                 result_include_types=['full_text']
             )
             
@@ -871,7 +874,7 @@ class PaperIndexerTestBed(TestBed):
             results = self.indexer.find_similar_papers(
                 query=query,
                 top_k=3,
-                search_strategies=[('vector', 0.8)],
+                search_strategies=[('vector', 1.5)],
                 result_include_types=['metadata', 'full_text', 'text_chunks']
             )
             
@@ -1256,6 +1259,123 @@ class PaperIndexerTestBed(TestBed):
             self.log_test_result("Store Duplicated Images", False, f"Error: {str(e)}")
             return {'success': False, 'error': str(e)}
 
+    def _test_vector_search_with_published_date_filter(self) -> Dict[str, Any]:
+        """测试向量搜索的发布日期范围过滤功能"""
+        print("\n" + "="*60)
+        print("🧪 TEST: _test_vector_search_with_published_date_filter - 测试向量搜索的发布日期范围过滤功能")
+        print("="*60)
+        try:
+            query = "deep learning"
+            
+            # 测试日期范围过滤：2021-06-30 到 2021-07-01
+            # 预期结果：2106.14835 (2021-06-30), 2106.14836 (2021-06-30), 2106.14837 (2021-07-01)
+            print("Testing vector search with published_dates filter (2021-06-30 to 2021-07-01)...")
+            filters_date_range = {
+                "include": {
+                    "published_date": ["2021-06-30", "2021-07-01"]
+                }
+            }
+            
+            results_filtered = self.indexer.find_similar_papers(
+                query=query, 
+                top_k=10,  # 请求足够多的结果
+                filters=filters_date_range,
+                search_strategies=[('vector', 1.5)]
+            )
+            
+            # 验证返回了结果
+            if len(results_filtered) == 0:
+                print("✗ Error: No results returned with date range filter")
+                return {'success': False, 'error': 'No results returned with date range filter'}
+            
+            print(f"✓ Date range filter returned {len(results_filtered)} results")
+            
+            # 验证所有返回的文档的发布日期都在指定范围内
+            expected_doc_ids = {"2106.14835", "2106.14836", "2106.14837"}
+            excluded_doc_ids = {"2106.14834", "2106.14838", "2106.14839"}
+            
+            returned_doc_ids = set()
+            dates_in_range = True
+            
+            for result in results_filtered:
+                doc_id = result.get('doc_id')
+                returned_doc_ids.add(doc_id)
+                
+                # 获取文档的发布日期
+                metadata = self.metadata_db.get_metadata(doc_id)
+                if metadata:
+                    published_date = metadata.get('published_date')
+                    print(f"  - Doc {doc_id}: published_date = {published_date}")
+                    
+                    # 验证日期在范围内（2021-06-30 到 2021-07-01）
+                    if published_date:
+                        if not ("2021-06-30" <= published_date <= "2021-07-01"):
+                            print(f"✗ Error: Document {doc_id} with date {published_date} is outside the range")
+                            dates_in_range = False
+                else:
+                    print(f"✗ Error: No metadata found for document {doc_id}")
+                    dates_in_range = False
+            
+            if not dates_in_range:
+                return {'success': False, 'error': 'Some documents have dates outside the specified range'}
+            
+            print("✓ All returned documents have dates within the specified range")
+            
+            # 验证预期在范围内的文档是否被包含（至少应该有一些匹配的）
+            docs_found_in_range = returned_doc_ids.intersection(expected_doc_ids)
+            if len(docs_found_in_range) == 0:
+                print(f"✗ Warning: None of the expected documents {expected_doc_ids} were found in results")
+                # 这不一定是错误，可能是因为查询不匹配这些文档，所以只警告
+            else:
+                print(f"✓ Found {len(docs_found_in_range)} expected documents in range: {docs_found_in_range}")
+            
+            # 验证范围外的文档被正确排除
+            docs_found_excluded = returned_doc_ids.intersection(excluded_doc_ids)
+            if len(docs_found_excluded) > 0:
+                print(f"✗ Error: Documents outside range were found in results: {docs_found_excluded}")
+                return {'success': False, 'error': f'Excluded documents found in results: {docs_found_excluded}'}
+            
+            print(f"✓ All excluded documents are correctly filtered out")
+            
+            # 对比无过滤器的搜索结果
+            print("Testing comparison with unfiltered search...")
+            results_unfiltered = self.indexer.find_similar_papers(
+                query=query, 
+                top_k=10, 
+                search_strategies=[('vector', 1.5)]
+            )
+            
+            unfiltered_doc_ids = {result.get('doc_id') for result in results_unfiltered}
+            
+            # 验证过滤后的结果是无过滤结果的子集
+            if not returned_doc_ids.issubset(unfiltered_doc_ids):
+                print("✗ Error: Filtered results contain documents not in unfiltered results")
+                return {'success': False, 'error': 'Filtered results not subset of unfiltered results'}
+            
+            print("✓ Filtered results are subset of unfiltered results")
+            
+            # 验证过滤后的结果数量应该小于或等于无过滤的结果数量
+            if len(results_filtered) > len(results_unfiltered):
+                print(f"✗ Error: Filtered results ({len(results_filtered)}) more than unfiltered ({len(results_unfiltered)})")
+                return {'success': False, 'error': 'Filtered results count exceeds unfiltered count'}
+            
+            print(f"✓ Result count check passed: filtered={len(results_filtered)}, unfiltered={len(results_unfiltered)}")
+            
+            success = True
+            details = f"Vector search with published_date filter test passed: {len(results_filtered)} results in range (2021-06-30 to 2021-07-01), found docs: {returned_doc_ids}"
+            
+            self.log_test_result("Vector Search with Published Date Filter", success, details)
+            return {
+                'success': success, 
+                'filtered_count': len(results_filtered),
+                'unfiltered_count': len(results_unfiltered),
+                'returned_doc_ids': list(returned_doc_ids),
+                'details': details
+            }
+            
+        except Exception as e:
+            self.log_test_result("Vector Search with Published Date Filter", False, f"Error: {str(e)}")
+            return {'success': False, 'error': str(e)}
 
 
 

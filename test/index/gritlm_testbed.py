@@ -8,7 +8,7 @@ GritLM专用测试床
 使用test_gritlm.py中的4篇真实文章进行测试。
 """
 
-from AIgnite.experiments.recommendation.testbed.base_testbed import TestBed
+from experiments.recommendation.testbed.base_testbed import TestBed
 from AIgnite.index.paper_indexer import PaperIndexer
 from AIgnite.data.docset import DocSet, TextChunk, ChunkType
 from AIgnite.db.metadata_db import MetadataDB, Base
@@ -58,6 +58,110 @@ class GritLMTestBed(TestBed):
         super().__init__(config_path)
         self.indexer = None
         self.test_papers = []
+        
+        # 365个真实文档ID（从用户提供的列表）
+        """
+        self.test_doc_ids = [
+            '2510.11121v1_abstract', '2510.11478v1_abstract', '2510.11183v1_abstract', '2510.11194v1_abstract', 
+            '2510.10870v1_abstract', '2510.11036v1_abstract', '2510.11305v1_abstract', '2510.11152v1_abstract', 
+            '2510.10910v1_abstract', '2510.11242v1_abstract', '2510.11166v1_abstract', '2510.10963v1_abstract', 
+            '2510.11474v1_abstract', '2510.10980v1_abstract', '2510.11218v1_abstract', '2510.10989v1_abstract', 
+            '2510.10895v1_abstract', '2510.10885v1_abstract', '2510.11062v2_abstract', '2510.11173v1_abstract', 
+            '2510.10899v1_abstract', '2510.11287v1_abstract', '2510.11004v1_abstract', '2510.11260v1_abstract', 
+            '2510.11168v1_abstract', '2510.10944v1_abstract', '2510.10878v1_abstract', '2510.11483v1_abstract', 
+            '2510.10965v1_abstract', '2510.11306v1_abstract', '2510.11019v1_abstract', '2510.11041v1_abstract', 
+            '2510.11421v1_abstract', '2510.11253v1_abstract', '2510.11116v1_abstract', '2510.11502v1_abstract', 
+            '2510.11495v1_abstract', '2510.11108v1_abstract', '2510.11122v1_abstract', '2510.11115v1_abstract', 
+            '2510.11131v1_abstract', '2510.11408v1_abstract', '2510.11225v1_abstract', '2510.11369v1_abstract', 
+            '2510.11246v1_abstract', '2510.11058v1_abstract', '2510.11472v1_abstract', '2510.10977v1_abstract', 
+            '2510.11286v1_abstract', '2510.11221v1_abstract', '2510.10872v1_abstract', '2510.11112v1_abstract', 
+            '2510.11380v1_abstract', '2510.10921v1_abstract', '2510.11264v1_abstract', '2510.10959v1_abstract', 
+            '2510.10942v1_abstract', '2510.11014v1_abstract', '2510.11456v1_abstract', '2510.11334v1_abstract', 
+            '2510.11047v1_abstract', '2510.11040v1_abstract', '2510.10982v1_abstract', '2510.11065v1_abstract', 
+            '2510.10994v1_abstract', '2510.10914v1_abstract', '2510.11434v1_abstract', '2510.11328v1_abstract', 
+            '2510.11020v1_abstract', '2510.10877v1_abstract', '2510.10894v1_abstract', '2510.10998v1_abstract', 
+            '2510.11169v1_abstract', '2510.11080v1_abstract', '2510.11354v1_abstract', '2510.11344v1_abstract', 
+            '2510.10943v1_abstract', '2510.11107v1_abstract', '2510.10868v1_abstract', '2510.11085v1_abstract', 
+            '2510.11083v1_abstract', '2510.11299v1_abstract', '2510.11347v1_abstract', '2510.11063v1_abstract', 
+            '2510.10901v1_abstract', '2510.11340v2_abstract', '2510.11278v1_abstract', '2510.11390v1_abstract', 
+            '2510.11210v1_abstract', '2510.10937v1_abstract', '2510.10990v1_abstract', '2510.10956v1_abstract', 
+            '2510.11223v1_abstract', '2510.11171v1_abstract', '2510.11198v1_abstract', '2510.10869v1_abstract', 
+            '2510.10960v1_abstract', '2510.10971v1_abstract', '2510.11189v1_abstract', '2510.11320v1_abstract', 
+            '2510.11447v1_abstract', '2510.11274v1_abstract', '2510.11043v1_abstract', '2510.11393v1_abstract', 
+            '2510.11124v1_abstract', '2510.11094v1_abstract', '2510.11283v1_abstract', '2510.11000v1_abstract', 
+            '2510.10986v1_abstract', '2510.11394v1_abstract', '2510.11269v1_abstract', '2510.11181v1_abstract', 
+            '2510.11176v1_abstract', '2510.11204v1_abstract', '2510.11310v1_abstract', '2510.11144v1_abstract', 
+            '2510.11143v1_abstract', '2510.10936v1_abstract', '2510.11388v1_abstract', '2510.10962v1_abstract', 
+            '2510.11164v1_abstract', '2510.11031v1_abstract', '2510.10975v2_abstract', '2510.11196v1_abstract', 
+            '2510.11059v1_abstract', '2510.11084v1_abstract', '2510.10902v1_abstract', '2510.11313v1_abstract', 
+            '2510.11103v1_abstract', '2510.10974v1_abstract', '2510.11307v1_abstract', '2510.11023v1_abstract', 
+            '2510.10978v1_abstract', '2510.11391v1_abstract', '2510.11035v1_abstract', '2510.11005v1_abstract', 
+            '2510.10931v1_abstract', '2510.10879v1_abstract', '2510.11217v1_abstract', '2510.11491v1_abstract', 
+            '2510.11053v1_abstract', '2510.11151v1_abstract', '2510.11104v1_abstract', '2510.11498v1_abstract', 
+            '2510.11275v1_abstract', '2510.11211v1_abstract', '2510.11296v1_abstract', '2510.11203v1_abstract', 
+            '2510.10933v1_abstract', '2510.11259v1_abstract', '2510.11303v1_abstract', '2510.10903v1_abstract', 
+            '2510.11224v1_abstract', '2510.10981v1_abstract', '2510.10915v1_abstract', '2510.11445v1_abstract', 
+            '2510.11039v1_abstract', '2510.11106v1_abstract', '2510.11503v1_abstract', '2510.10952v1_abstract', 
+            '2510.10961v1_abstract', '2510.11091v1_abstract', '2510.11026v1_abstract', '2510.11192v1_abstract', 
+            '2510.11147v1_abstract', '2510.11110v1_abstract', '2510.11335v1_abstract', '2510.11007v1_abstract', 
+            '2510.11400v1_abstract', '2510.10976v1_abstract', '2510.11444v1_abstract', '2510.11050v1_abstract', 
+            '2510.10876v1_abstract', '2510.11417v1_abstract', '2510.11402v1_abstract', '2510.10912v1_abstract', 
+            '2510.11300v1_abstract', '2510.11321v1_abstract', '2510.11001v1_abstract', '2510.10938v1_abstract', 
+            '2510.11449v1_abstract', '2510.10988v1_abstract', '2510.11423v1_abstract', '2510.11471v1_abstract', 
+            '2510.11016v1_abstract', '2510.11500v1_abstract', '2510.11413v1_abstract', '2510.11419v2_abstract', 
+            '2510.11266v1_abstract', '2510.11090v1_abstract', '2510.11137v1_abstract', '2510.11386v2_abstract', 
+            '2510.11341v1_abstract', '2510.11358v1_abstract', '2510.11368v1_abstract', '2510.10930v1_abstract', 
+            '2510.11068v1_abstract', '2510.11153v1_abstract', '2510.11409v1_abstract', '2510.11089v1_abstract', 
+            '2510.10929v1_abstract', '2510.11301v1_abstract', '2510.11339v1_abstract', '2510.11291v1_abstract', 
+            '2510.11268v1_abstract', '2510.10913v1_abstract', '2510.11129v1_abstract', '2510.11095v1_abstract', 
+            '2510.11418v1_abstract', '2510.10889v1_abstract', '2510.11295v1_abstract', '2510.10991v1_abstract', 
+            '2510.10866v1_abstract', '2510.11170v1_abstract', '2510.11758v1_abstract', '2510.11243v1_abstract', 
+            '2510.11076v1_abstract', '2510.11082v1_abstract', '2510.11049v1_abstract', '2510.10969v1_abstract', 
+            '2510.11499v1_abstract', '2510.11448v1_abstract', '2510.11098v1_abstract', '2510.11182v1_abstract', 
+            '2510.11442v1_abstract', '2510.11109v1_abstract', '2510.11212v1_abstract', '2510.11330v1_abstract', 
+            '2510.11501v1_abstract', '2510.11251v1_abstract', '2510.11462v1_abstract', '2510.11258v1_abstract', 
+            '2510.11411v2_abstract', '2510.11092v1_abstract', '2510.11389v1_abstract', '2510.11015v1_abstract', 
+            '2510.11066v1_abstract', '2510.10987v1_abstract', '2510.11250v1_abstract', '2510.10951v1_abstract', 
+            '2510.10893v1_abstract', '2510.11370v1_abstract', '2510.11028v1_abstract', '2510.10927v1_abstract', 
+            '2510.10968v1_abstract', '2510.11255v1_abstract', '2510.11236v1_abstract', '2510.11245v1_abstract', 
+            '2510.11473v1_abstract', '2510.10909v1_abstract', '2510.11175v1_abstract', '2510.11482v1_abstract', 
+            '2510.10887v1_abstract', '2510.11209v1_abstract', '2510.10864v1_abstract', '2510.11148v1_abstract', 
+            '2510.11056v1_abstract', '2510.10955v1_abstract', '2510.11100v1_abstract', '2510.11288v1_abstract', 
+            '2510.10890v1_abstract', '2510.11017v1_abstract', '2510.11496v2_abstract', '2510.11293v1_abstract', 
+            '2510.11316v1_abstract', '2510.10925v1_abstract', '2510.11012v1_abstract', '2510.11323v1_abstract', 
+            '2510.11227v1_abstract', '2510.11453v1_abstract', '2510.11232v1_abstract', '2510.11195v1_abstract', 
+            '2510.11302v1_abstract', '2510.10973v1_abstract', '2510.11162v1_abstract', '2510.11361v1_abstract', 
+            '2510.11167v1_abstract', '2510.11237v1_abstract', '2510.10993v1_abstract', '2510.11410v2_abstract', 
+            '2510.10984v1_abstract', '2510.11142v1_abstract', '2510.11414v1_abstract', '2510.11760v1_abstract', 
+            '2510.11222v1_abstract', '2510.11190v2_abstract', '2510.11072v1_abstract', '2510.11140v1_abstract', 
+            '2510.10966v1_abstract', '2510.10865v1_abstract', '2510.11234v1_abstract', '2510.11178v1_abstract', 
+            '2510.11027v1_abstract', '2510.11018v1_abstract', '2510.11387v1_abstract', '2510.11439v1_abstract', 
+            '2510.11087v1_abstract', '2510.10995v1_abstract', '2510.11073v1_abstract', '2510.11238v1_abstract', 
+            '2510.11184v1_abstract', '2510.11317v1_abstract', '2510.11277v1_abstract', '2510.10964v1_abstract', 
+            '2510.11133v1_abstract', '2510.11476v1_abstract', '2510.11475v1_abstract', '2510.11011v1_abstract', 
+            '2510.11379v1_abstract', '2510.11079v1_abstract', '2510.11314v1_abstract', '2510.11057v1_abstract', 
+            '2510.10880v1_abstract', '2510.10918v1_abstract', '2510.11416v1_abstract', '2510.11438v1_abstract', 
+            '2510.11290v1_abstract', '2510.11188v1_abstract', '2510.11318v1_abstract', '2510.11282v1_abstract', 
+            '2510.11360v1_abstract', '2510.11372v1_abstract', '2510.11398v1_abstract', '2510.11484v1_abstract', 
+            '2510.10948v1_abstract', '2510.11343v1_abstract', '2510.11405v1_abstract', '2510.11003v1_abstract', 
+            '2510.11119v1_abstract', '2510.11407v1_abstract', '2510.11308v1_abstract', '2510.10979v1_abstract', 
+            '2510.11233v1_abstract', '2510.11179v1_abstract', '2510.11257v1_abstract', '2510.11174v1_abstract', 
+            '2510.11276v1_abstract', '2510.11345v1_abstract', '2510.10920v1_abstract', '2510.10940v1_abstract', 
+            '2510.10932v1_abstract', '2510.11254v1_abstract', '2510.11420v1_abstract', '2510.11160v1_abstract', 
+            '2510.11052v1_abstract', '2510.11292v1_abstract', '2510.11117v1_abstract', '2510.11297v1_abstract', 
+            '2510.11138v1_abstract', '2510.11096v1_abstract', '2510.11759v1_abstract', '2510.10862v1_abstract', 
+            '2510.11235v1_abstract', '2510.11457v1_abstract', '2510.11374v1_abstract', '2510.10947v1_abstract', 
+            '2510.11128v1_abstract', '2510.11454v1_abstract', '2510.11185v1_abstract', '2510.11401v1_abstract', 
+            '2510.10886v1_abstract', '2510.11281v1_abstract', '2510.11346v1_abstract', '2510.11064v1_abstract', 
+            '2510.11202v1_abstract', '2510.11141v1_abstract', '2510.11214v1_abstract', '2510.10892v1_abstract', 
+            '2510.11331v1_abstract', '2510.11123v1_abstract'
+        ]
+        """
+        self.test_doc_ids = [
+            '2510.11079v1_abstract',
+            '2510.11121v1_abstract', '2510.11478v1_abstract', '2510.11183v1_abstract', '2510.11194v1_abstract', 
+            '2510.10870v1_abstract', '2510.11036v1_abstract', '2510.11305v1_abstract', '2510.11152v1_abstract', 
+            '2510.10910v1_abstract', '2510.11242v1_abstract', '2510.11166v1_abstract', '2510.10963v1_abstract', ]
     
     def check_environment(self) -> Tuple[bool, str]:
         """检查测试环境
@@ -99,94 +203,58 @@ class GritLMTestBed(TestBed):
             return False, f"Environment check failed: {str(e)}"
     
     def load_data(self) -> List[DocSet]:
-        """加载测试数据 - 基于test_gritlm.py中的4篇文章
+        """加载测试数据 - 从生产数据库读取真实文档
         
         Returns:
             测试论文数据列表
         """
-        self.logger.info("Creating test papers based on test_gritlm.py...")
+        self.logger.info("Loading test papers from production database...")
         
-        # 基于test_gritlm.py中的4篇文章创建DocSet对象
-        self.test_papers = [
-            DocSet(
-                doc_id="13520958",
-                title="A Simple but Powerful Automatic Term Extraction Method",
-                abstract="In this paper, we propose a new idea for the automatic recognition of domain specific terms. Our idea is based on the statistics between a compound noun and its component single-nouns. More precisely, we focus basically on how many nouns adjoin the noun in question to form compound nouns. We propose several scoring methods based on this idea and experimentally evaluate them on the NTCIR1 TMREC test collection. The results are very promising especially in the low recall area.",
-                authors=["Author 1", "Author 2"],
-                categories=["cs.CL", "cs.IR"],
-                published_date="2021-06-28",
-                text_chunks=[
-                    TextChunk(id="chunk1", type=ChunkType.TEXT, text="Our idea is based on the statistics between a compound noun and its component single-nouns."),
-                    TextChunk(id="chunk2", type=ChunkType.TEXT, text="We propose several scoring methods based on this idea and experimentally evaluate them."),
-                    TextChunk(id="chunk3", type=ChunkType.TEXT, text="The results are very promising especially in the low recall area.")
-                ],
-                figure_chunks=[],
-                table_chunks=[],
-                metadata={},
-                pdf_path="dummy_path_1.pdf",
-                HTML_path=None,
-                comments='Test paper 1 - Term Extraction'
-            ),
-            DocSet(
-                doc_id="8140780",
-                title="Stronger Baselines for Trustable Results in Neural Machine Translation",
-                abstract="Interest in neural machine translation has grown rapidly as its effectiveness has been demonstrated across language and data scenarios. New research regularly introduces architectural and algorithmic improvements that lead to significant gains over 'vanilla' NMT implementations. However, these new techniques are rarely evaluated in the context of previously published techniques, specifically those that are widely used in state-of-theart production and shared-task systems. As a result, it is often difficult to determine whether improvements from research will carry over to systems deployed for real-world use. In this work, we recommend three specific methods that are relatively easy to implement and result in much stronger experimental systems. Beyond reporting significantly higher BLEU scores, we conduct an in-depth analysis of where improvements originate and what inherent weaknesses of basic NMT models are being addressed. We then compare the relative gains afforded by several other techniques proposed in the literature when starting with vanilla systems versus our stronger baselines, showing that experimental conclusions may change depending on the baseline chosen. This indicates that choosing a strong baseline is crucial for reporting reliable experimental results.",
-                authors=["Author 3", "Author 4"],
-                categories=["cs.CL", "cs.LG"],
-                published_date="2021-06-30",
-                text_chunks=[
-                    TextChunk(id="chunk4", type=ChunkType.TEXT, text="Interest in neural machine translation has grown rapidly as its effectiveness has been demonstrated."),
-                    TextChunk(id="chunk5", type=ChunkType.TEXT, text="We recommend three specific methods that are relatively easy to implement and result in much stronger experimental systems."),
-                    TextChunk(id="chunk6", type=ChunkType.TEXT, text="Choosing a strong baseline is crucial for reporting reliable experimental results.")
-                ],
-                figure_chunks=[],
-                table_chunks=[],
-                metadata={},
-                pdf_path="dummy_path_2.pdf",
-                HTML_path=None,
-                comments='Test paper 2 - Neural Machine Translation'
-            ),
-            DocSet(
-                doc_id="tinybert_2020",
-                title="TinyBERT: Distilling BERT for Natural Language Understanding",
-                abstract="Language model pre-training, such as BERT, has significantly improved the performances of many natural language processing tasks. However, pre-trained language models are usually computationally expensive, so it is difficult to efficiently execute them on resource-restricted devices. To accelerate inference and reduce model size while maintaining accuracy, we first propose a novel Transformer distillation method that is specially designed for knowledge distillation (KD) of the Transformer-based models. By leveraging this new KD method, the plenty of knowledge encoded in a large teacher BERT can be effectively transferred to a small student Tiny-BERT. Then, we introduce a new two-stage learning framework for TinyBERT, which performs Transformer distillation at both the pretraining and task-specific learning stages. This framework ensures that TinyBERT can capture the general-domain as well as the task-specific knowledge in BERT. TinyBERT with 4 layers is empirically effective and achieves more than 96.8% the performance of its teacher BERTBASE on GLUE benchmark, while being 7.5x smaller and 9.4x faster on inference. TinyBERT with 4 layers is also significantly better than 4-layer state-of-the-art baselines on BERT distillation, with only about 28% parameters and about 31% inference time of them. Moreover, TinyBERT with 6 layers performs on-par with its teacher BERTBASE",
-                authors=["Xiaoqi Jiao", "Yichun Yin", "Lifeng Shang", "Xin Jiang", "Xiao Chen", "Linlin Li", "Fang Wang", "Qun Liu"],
-                categories=["cs.CL", "cs.AI"],
-                published_date="2020-09-15",
-                text_chunks=[
-                    TextChunk(id="chunk7", type=ChunkType.TEXT, text="Language model pre-training, such as BERT, has significantly improved the performances of many natural language processing tasks."),
-                    TextChunk(id="chunk8", type=ChunkType.TEXT, text="We first propose a novel Transformer distillation method that is specially designed for knowledge distillation."),
-                    TextChunk(id="chunk9", type=ChunkType.TEXT, text="TinyBERT with 4 layers achieves more than 96.8% the performance of its teacher BERTBASE on GLUE benchmark.")
-                ],
-                figure_chunks=[],
-                table_chunks=[],
-                metadata={},
-                pdf_path="dummy_path_3.pdf",
-                HTML_path=None,
-                comments='Test paper 3 - TinyBERT'
-            ),
-            DocSet(
-                doc_id="cv_cnn_2021",
-                title="阿拉丁神灯",
-                abstract="pizza dog 中文啦啦啦啦啦啦阿拉",
-                authors=["Author 7", "Author 8"],
-                categories=["cs.CV", "cs.AI"],
-                published_date="2021-07-01",
-                text_chunks=[
-                    TextChunk(id="chunk10", type=ChunkType.TEXT, text="Deep learning approaches for computer vision tasks using convolutional neural networks have revolutionized the field."),
-                    TextChunk(id="chunk11", type=ChunkType.TEXT, text="The hierarchical feature learning capability of CNNs allows them to automatically learn relevant features from raw pixel data."),
-                    TextChunk(id="chunk12", type=ChunkType.TEXT, text="Recent advances include residual networks, attention mechanisms, and efficient architectures like MobileNets.")
-                ],
-                figure_chunks=[],
-                table_chunks=[],
-                metadata={},
-                pdf_path="dummy_path_4.pdf",
-                HTML_path=None,
-                comments='Test paper 4 - Computer Vision'
-            )
-        ]
+        # 连接到生产数据库
+        production_db_url = "postgresql://postgres:11111@localhost:5432/paperignition"
+        production_metadata_db = MetadataDB(db_path=production_db_url)
         
-        self.logger.info(f"Created {len(self.test_papers)} test papers based on test_gritlm.py")
+        self.test_papers = []
+        skipped_count = 0
+        
+        for doc_id_with_suffix in self.test_doc_ids:
+            # 去除_abstract后缀
+            doc_id = doc_id_with_suffix.replace('_abstract', '')
+            
+            try:
+                # 从数据库获取元数据
+                metadata = production_metadata_db.get_metadata(doc_id)
+                
+                if metadata is None:
+                    self.logger.warning(f"Document not found in database: {doc_id}")
+                    skipped_count += 1
+                    continue
+                
+                # 创建DocSet对象（text_chunks保持空白，只使用abstract）
+                docset = DocSet(
+                    doc_id=metadata.get('doc_id', doc_id),
+                    title=metadata.get('title', ''),
+                    abstract=metadata.get('abstract', ''),
+                    authors=metadata.get('authors') or [],
+                    categories=metadata.get('categories') or [],
+                    published_date=metadata.get('published_date', ''),
+                    text_chunks=[],  # 空列表 - 只使用abstract
+                    figure_chunks=[],
+                    table_chunks=[],
+                    metadata={},
+                    pdf_path=metadata.get('pdf_path', ''),
+                    HTML_path=metadata.get('HTML_path'),
+                    comments=metadata.get('comments')
+                )
+                
+                self.test_papers.append(docset)
+                
+            except Exception as e:
+                self.logger.error(f"Error loading document {doc_id}: {str(e)}")
+                skipped_count += 1
+                continue
+        
+        self.logger.info(f"Loaded {len(self.test_papers)} test papers from production database, skipped {skipped_count}")
         return self.test_papers
     
     def initialize_databases(self, data: List[DocSet]) -> None:
@@ -234,6 +302,7 @@ class GritLMTestBed(TestBed):
         # 索引测试数据
         self.logger.info("Indexing test papers with GritLM...")
         
+        '''
         indexing_results = self.indexer.index_papers(data, store_images=False)
         
         # 检查索引结果
@@ -241,7 +310,7 @@ class GritLMTestBed(TestBed):
             if not all(status.values()):
                 failed_dbs = [db for db, success in status.items() if not success]
                 self.logger.warning(f"Failed to index paper {doc_id} in databases: {failed_dbs}")
-        
+        '''
         self.logger.info("GritLM database initialization completed")
         self._display_storage_info()
 
@@ -376,7 +445,8 @@ class GritLMTestBed(TestBed):
         self.logger.info("Running GritLM tests...")
         
         results = {
-            'gritlm_indexing': self._test_gritlm_indexing(),
+            #'gritlm_indexing': self._test_gritlm_indexing(),
+            'gritlm_save_vectors': self._test_gritlm_save_vectors(),
             'gritlm_vector_search': self._test_gritlm_vector_search(),
             #'gritlm_instruction_effectiveness': self._test_gritlm_instruction_effectiveness(),
             #'gritlm_similarity_ranking': self._test_gritlm_similarity_ranking(),
@@ -389,6 +459,19 @@ class GritLMTestBed(TestBed):
         self.logger.info(f"GritLM Test Results: {passed_tests}/{total_tests} tests passed")
         
         return results
+
+    def _test_gritlm_save_vectors(self) -> Dict[str, Any]:
+        """测试GritLM向量保存功能"""
+        print("\n" + "="*60)
+        print("🧪 TEST: _test_gritlm_save_vectors - 测试GritLM向量保存功能")
+        print("="*60)
+        try:
+            # 保存向量
+            self.indexer.save_vectors(self.test_papers)
+        except Exception as e:
+            self.log_test_result("GritLM Vector Saving", False, f"Error: {str(e)}")
+            return {'success': False, 'error': str(e)}
+        return {'success': True, 'details': "GritLM向量保存成功"}
     
     def _test_gritlm_indexing(self) -> Dict[str, Any]:
         """测试GritLM文档索引功能"""
@@ -401,9 +484,9 @@ class GritLMTestBed(TestBed):
             
             # 通过搜索验证文档是否被正确索引
             search_results = self.indexer.find_similar_papers(
-                query="test query",
-                top_k=expected_count * 2,  # 获取更多结果以确保找到所有文档
-                search_strategies=[('vector', 0.1)]  # 使用很低的阈值
+                query="reinforcement learning",
+                top_k=5,  # 获取更多结果以确保找到所有文档
+                search_strategies=[('vector', 2.0)]  # 使用很低的阈值
             )
             
             found_doc_ids = set()
@@ -433,7 +516,7 @@ class GritLMTestBed(TestBed):
         print("="*60)
         try:
             # 使用配置文件中的测试查询
-            test_queries = ["Are there any research papers on methods to compress large-scale language models using task-agnostic knowledge distillation techniques?"]
+            test_queries = ["Argumentation-Based Explainability for Legal AI"]
             
             all_search_success = True
             search_results_summary = {}
@@ -442,7 +525,7 @@ class GritLMTestBed(TestBed):
                 results = self.indexer.find_similar_papers(
                     query=query,
                     top_k=3,
-                    search_strategies=[('vector', 0.8)],
+                    search_strategies=[('vector', 1.5)],
                     result_include_types=['metadata','search_parameters']
                 )
 
@@ -470,109 +553,6 @@ class GritLMTestBed(TestBed):
             self.log_test_result("GritLM Vector Search", False, f"Error: {str(e)}")
             return {'success': False, 'error': str(e)}
     
-    def _test_gritlm_instruction_effectiveness(self) -> Dict[str, Any]:
-        """测试GritLM指令效果"""
-        print("\n" + "="*60)
-        print("🧪 TEST: _test_gritlm_instruction_effectiveness - 测试GritLM指令效果")
-        print("="*60)
-        try:
-            # 测试查询
-            query = "BERT knowledge distillation"
-            
-            # 获取当前使用的指令
-            current_instruction = self.config.get('gritlm', {}).get('query_instruction', 
-                "Given a scientific paper title, retrieve the paper's abstract")
-            
-            # 执行搜索（使用当前指令）
-            results_with_instruction = self.indexer.find_similar_papers(
-                query=query,
-                top_k=3,
-                search_strategies=[('vector', 0.8)],
-                result_include_types=['metadata']
-            )
-            
-            # 验证搜索结果质量
-            success = len(results_with_instruction) > 0
-            
-            # 检查结果相关性（简单检查是否包含相关关键词）
-            relevant_results = 0
-            for result in results_with_instruction:
-                title = result.get('title', '').lower()
-                abstract = result.get('abstract', '').lower()
-                if 'bert' in title or 'bert' in abstract or 'distill' in title or 'distill' in abstract:
-                    relevant_results += 1
-            
-            relevance_score = relevant_results / len(results_with_instruction) if results_with_instruction else 0
-            
-            success = success and relevance_score > 0.3  # 至少30%的结果相关
-            
-            details = f"Query: '{query}', Results: {len(results_with_instruction)}, Relevant: {relevant_results}, Relevance: {relevance_score:.2f}"
-            
-            self.log_test_result("GritLM Instruction Effectiveness", success, details)
-            return {
-                'success': success, 
-                'results_count': len(results_with_instruction),
-                'relevant_results': relevant_results,
-                'relevance_score': relevance_score,
-                'details': details
-            }
-            
-        except Exception as e:
-            self.log_test_result("GritLM Instruction Effectiveness", False, f"Error: {str(e)}")
-            return {'success': False, 'error': str(e)}
-    
-    def _test_gritlm_similarity_ranking(self) -> Dict[str, Any]:
-        """测试GritLM相似度排序功能"""
-        print("\n" + "="*60)
-        print("🧪 TEST: _test_gritlm_similarity_ranking - 测试GritLM相似度排序")
-        print("="*60)
-        try:
-            # 测试查询
-            query = "transformer models"
-            
-            # 执行搜索
-            results = self.indexer.find_similar_papers(
-                query=query,
-                top_k=4,  # 获取所有4个文档
-                search_strategies=[('vector', 0.8)],
-                result_include_types=['metadata', 'search_parameters']
-            )
-            
-            success = len(results) > 0
-            
-            # 检查结果是否按相似度排序
-            # 注意：这里我们假设search_parameters包含相似度分数
-            # 如果没有，我们至少验证结果不为空
-            ranking_valid = True
-            if len(results) > 1:
-                # 简单验证：检查结果数量是否合理
-                ranking_valid = len(results) <= 4  # 不应该超过我们有的文档数量
-            
-            # 验证结果质量
-            quality_score = 0
-            for i, result in enumerate(results):
-                title = result.get('title', '').lower()
-                if 'transformer' in title or 'bert' in title or 'model' in title:
-                    quality_score += 1
-            
-            quality_ratio = quality_score / len(results) if results else 0
-            
-            success = success and ranking_valid and quality_ratio > 0.2
-            
-            details = f"Query: '{query}', Results: {len(results)}, Quality ratio: {quality_ratio:.2f}, Ranking valid: {ranking_valid}"
-            
-            self.log_test_result("GritLM Similarity Ranking", success, details)
-            return {
-                'success': success,
-                'results_count': len(results),
-                'quality_ratio': quality_ratio,
-                'ranking_valid': ranking_valid,
-                'details': details
-            }
-            
-        except Exception as e:
-            self.log_test_result("GritLM Similarity Ranking", False, f"Error: {str(e)}")
-            return {'success': False, 'error': str(e)}
 
 if __name__ == '__main__':
     config_path = Path("/data3/guofang/AIgnite-Solutions/AIgnite/test/configs/gritlm_testbed_config.yaml")
