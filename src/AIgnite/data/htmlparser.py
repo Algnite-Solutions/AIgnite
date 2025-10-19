@@ -94,7 +94,7 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
 
         search = arxiv.Search(
             query=query,
-            max_results=1,  # You can set max papers you want here
+            max_results=None,  # You can set max papers you want here
             sort_by=arxiv.SortCriterion.SubmittedDate
         )
         #print('only 3 papers')
@@ -272,20 +272,38 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
 
         print("Init over. Now begin chunking...")
 
-            # 读取已处理的论文列表
-        processed_papers = set()
+            # 读取已处理的论文列表，获取最后一行作为基准
+        last_processed_id = None
         try:
             with open(self.arxiv_pool, "r", encoding="utf-8") as f:
-                processed_papers = set(line.strip() for line in f.readlines())
+                lines = f.readlines()
+                if lines:
+                    last_processed_id = lines[-1].strip()
         except FileNotFoundError:
             pass
 
+        # 提取基准ID的前9位数字
+        baseline_number = None
+        if last_processed_id:
+            # 提取前9位数字，例如从 "2510.01878v1" 提取 "251001878"
+            match = re.match(r'(\d{4})\.(\d{5})', last_processed_id)
+            if match:
+                baseline_number = int(match.group(1) + match.group(2))
+
         for filename in os.listdir(self.html_text_folder):
+            #print("test2")
             if filename.endswith(".html"):
-                # 检查是否已处理
                 arxiv_id = filename[:-5]
-                if arxiv_id in processed_papers:
-                    continue
+                
+                # 如果有基准ID，只处理前9位数字更大的论文
+                if baseline_number is not None:
+                    match = re.match(r'(\d{4})\.(\d{5})', arxiv_id)
+                    if match:
+                        current_number = int(match.group(1) + match.group(2))
+
+                        if current_number <= baseline_number:
+                            print("continue")
+                            continue
                 file_path = os.path.join(self.html_text_folder, filename)
 
                 with open(file_path, 'r', encoding='utf-8') as file:
@@ -293,6 +311,7 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
                     soup = BeautifulSoup(html_content, "html.parser")
 
                     for docset in self.docs:
+                        #print(docset.doc_id, filename[:-5])
                         if docset.doc_id == filename[:-5] and docset.HTML_path is not None:
                             print(f"Processing {docset.doc_id}")
                             figurechunks = self.extract_figures_to_folder(soup,self.image_folder_path,docset.doc_id)

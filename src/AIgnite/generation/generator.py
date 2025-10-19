@@ -7,7 +7,7 @@ from google import genai
 from google.genai import types
 from AIgnite.data.docset import DocSet
 from tqdm import tqdm
-
+import time
 
 class BaseGenerator(ABC):
     """
@@ -25,14 +25,29 @@ class GeminiBlogGenerator(BaseGenerator):
     TODO: @Qi, replace data_path and output_path with the actual DB_query and DB_write functions.
     """
     def __init__(self, model_name="gemini-2.5-flash", data_path="./output", output_path="./experiments/output"):
-        self.client = genai.Client(api_key="AIzaSyDQS4jFfedzDourgwQxiP4hhOR0lK67l44")
+        self.client = genai.Client(api_key="AIzaSyDEQPtg4BI3f6rUD_RhoTzYGxCg_HXsIRo")
         self.model_name = model_name
         self.data_path = data_path
         self.output_path = output_path
 
     def generate_digest(self, papers: List[DocSet]):
-        for paper in papers:
+        import concurrent.futures
+        import threading
+        
+        def generate_with_delay(paper):
             self._generate_single_blog(paper)
+            time.sleep(5)
+        
+        # 使用线程池进行并行处理，限制最大并发数避免API限制
+        max_workers = min(len(papers), 50)  # 最多50个并发任务
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(generate_with_delay, paper) for paper in papers]
+            # 等待所有任务完成
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    print(f"处理论文时出错: {e}")
 
     def _generate_single_blog(self, paper: DocSet):
         # Read and encode the PDF bytes
@@ -40,17 +55,6 @@ class GeminiBlogGenerator(BaseGenerator):
             pdf_data = pdf_file.read()
 
         arxiv_id = paper.doc_id
-
-        prompt = f"""
-        You're generating a mark down blog post summarizing a paper with arXiv ID {arxiv_id} for researchers in the field. The style is similar to medium science blog.
-
-        In your blog, you can cite a **few of the most important figures** from the paper (ideally no more than 3) to help understanding. For each selected figure, render it as a standalone Markdown image:
-          <br>![Figure X: short caption]({self.data_path}/{arxiv_id}_FigureX.png)<br>
-
-        Do **not** use inline figure references like “as shown in Figure 2”. Do **not** cite tables.
-        Start directly with Blog title.
-        """
-
         prompt = f"""
         你是一个专业的科技博客作者，专门为中国的研究人员撰写学术论文的中文博客总结。
       你的任务是：
@@ -86,23 +90,39 @@ class GeminiBlogGenerator(BaseGenerator):
       ![Figure X: short caption]({self.data_path}/{arxiv_id}_FigureX.png)
 
       论文的额外信息（如官方网站、代码、数据集等）可以使用超链接。
-
-      论文标题：{paper.title}
-      作者：{paper.authors}
-      摘要：{paper.abstract}
-      论文内容：{paper.text_chunks}
         """
+        import time
 
-        response = self.client.models.generate_content(
-            model=self.model_name,
-            contents=[
-                types.Part.from_bytes(
+        max_retries = 5
+        for attempt in range(1, max_retries + 1):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=[
+                        prompt,
+                        types.Part.from_bytes(
+                            data=pdf_data,
+                            mime_type='application/pdf',
+                        ),
+                    ]
+                )
+                break  # 成功就跳出循环
+            except Exception as e:
+                print(f"处理论文时出错（第 {attempt} 次尝试）: {e}")
+                if attempt < max_retries:
+                    sleep_time = 2 ** attempt  # 指数退避（2, 4, 8, 16...秒）
+                    print(f"等待 {sleep_time} 秒后重试...")
+                    time.sleep(sleep_time)
+                else:
+                    print("已达到最大重试次数，终止。")
+                    return
+
+        """
+        types.Part.from_bytes(
                     data=pdf_data,
                     mime_type='application/pdf',
                 ),
-                prompt
-            ]
-        )
+        """
 
         markdown_path = os.path.join(self.output_path, f"{arxiv_id}.md")
         os.makedirs(os.path.dirname(markdown_path), exist_ok=True)  # 确保目录存在
