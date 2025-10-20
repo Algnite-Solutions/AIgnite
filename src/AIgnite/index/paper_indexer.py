@@ -252,12 +252,23 @@ class PaperIndexer(BaseIndexer):
         
         Args:
             papers: 论文列表
-            indexing_status: 可选的索引状态字典
+            indexing_status: 可选的索引状态字典，如果为None则自动创建
             
         Returns:
-            更新后的 indexing_status 字典
+            indexing_status 字典，包含所有论文的向量保存状态
         """
         try:
+            # 初始化 indexing_status（如果为 None）
+            if indexing_status is None:
+                indexing_status = {}
+                for paper in papers:
+                    indexing_status[paper.doc_id] = {
+                        "metadata": False,
+                        "text_chunks": False,
+                        "vectors": False,
+                        "images": False
+                    }
+            
             # 记录每篇论文的添加状态
             add_results = {}
             
@@ -282,16 +293,14 @@ class PaperIndexer(BaseIndexer):
             if not save_success:
                 logger.error(f"Failed to save vector database after adding {len(papers)} papers")
                 # 如果保存失败，所有论文的向量状态都应该标记为失败
-                if indexing_status:
-                    for paper in papers:
-                        indexing_status[paper.doc_id]["vectors"] = False
+                for paper in papers:
+                    indexing_status[paper.doc_id]["vectors"] = False
                 return indexing_status
             
             # 保存成功，更新所有成功添加的论文状态
-            if indexing_status:
-                for paper in papers:
-                    # 只有添加成功且保存成功的才标记为 True
-                    indexing_status[paper.doc_id]["vectors"] = add_results.get(paper.doc_id, False)
+            for paper in papers:
+                # 只有添加成功且保存成功的才标记为 True
+                indexing_status[paper.doc_id]["vectors"] = add_results.get(paper.doc_id, False)
             
             logger.info(f"Successfully saved vectors for {len(papers)} papers to disk")
             return indexing_status
@@ -509,10 +518,31 @@ class PaperIndexer(BaseIndexer):
             ValueError: If no search strategy is available or required database is missing
         """
         try:
-            logger.debug(f"Searching for query: {query}")
+            logger.debug(f"Searching for query: {query}, filters: {filters is not None}")
             
-            # 1. 执行搜索
-            search_results = self._execute_search(query, top_k, filters, search_strategies)
+            # 1. 预过滤：如果有filters，先通过metadata_db获取候选doc_ids
+            if filters and self.metadata_db is None:
+                raise ValueError("Metadata database is required for filtering")
+            
+            simplified_filters = None
+            if filters:
+                candidate_doc_ids = self.metadata_db.get_filtered_doc_ids(filters)
+                
+                if not candidate_doc_ids:
+                    logger.info("No documents match the filters, returning empty results")
+                    return []
+                
+                logger.info(f"Filter applied: {len(candidate_doc_ids)} candidate documents")
+                
+                # 将候选doc_ids转换为简化的filter格式
+                #vector_search_candidate_doc_ids = [docid+'_abstract' for docid in candidate_doc_ids]
+                simplified_filters = {"include": {"doc_ids": candidate_doc_ids}}
+                
+            else:
+                logger.debug("No filters provided")
+            
+            # 2. 执行搜索（使用简化后的filters）
+            search_results = self._execute_search(query, top_k, simplified_filters, search_strategies)
             
             if not search_results:
                 logger.debug("No search results found")

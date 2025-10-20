@@ -101,7 +101,7 @@ class VectorSearchStrategy(SearchStrategy):
         
         # 1. 调用每个搜索策略
             for strategy, strategy_cutoff in self.search_strategies:
-                #print('IN VECTOR SEARCH STRATEGY')
+                
                 strategy_results = strategy.search(
                     query=query, 
                     top_k=top_k,  # 获取更多候选结果 # 获取更多候选结果
@@ -111,10 +111,10 @@ class VectorSearchStrategy(SearchStrategy):
             #vector_results = self.vector_db.search(query, k=top_k, filters=filters)
             
             # Process results
-            #print('Within search strategy')
+            
             results = []
             for entry, score in vector_results:
-                print(entry,score)
+                #print(entry,score)
                 if score > strategy_cutoff:
                     continue
                 
@@ -177,8 +177,7 @@ class TFIDFSearchStrategy(SearchStrategy):
                 filters=filters
             )
             '''
-            #print('IN TFIDFSearchStrategy')
-            #print(search_results)
+            
             # Convert to SearchResult objects
             results = []
             for result in search_results:
