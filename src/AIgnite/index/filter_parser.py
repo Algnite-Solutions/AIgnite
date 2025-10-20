@@ -118,12 +118,12 @@ class FilterParser:
                 return None
         elif isinstance(value, list) and len(value) == 2:
             # Date range
-            #print('VALIDATE DATE RANGE: ', value)
+            
             try:
                 start_date = datetime.fromisoformat(value[0])
                 end_date = datetime.fromisoformat(value[1])
                 end_date = end_date + timedelta(days=1)
-                #print('END DATE: ', end_date.isoformat())
+                
                 if start_date > end_date:
                     logger.error(f"Start date {value[0]} is after end date {value[1]}")
                     return None

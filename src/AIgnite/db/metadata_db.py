@@ -657,8 +657,7 @@ class MetadataDB:
                 logger.warning("Filters parsed to None, returning empty list")
                 return []
             filter_where, filter_params = filter_parser.get_sql_conditions(parsed_filters)
-            #print('FILTER WHERE: ', filter_where)
-            #print('FILTER PARAMS: ', filter_params)
+            
 
             if filter_where == "1=1":
                 return []

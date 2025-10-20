@@ -170,8 +170,7 @@ class GritLMEmbeddings(Embeddings):
         Returns:
             Formatted instruction string
         """
-        #print("ENTERING GRITLM INSTRUCTION MODE:")
-        #print("INSTRUCTION:", instruction)
+        
         return "<|user|>\n" + instruction + "\n<|embed|>\n" if instruction else "<|embed|>\n"
     
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
@@ -641,9 +640,7 @@ class VectorDB:
                     for docstore_id, doc in self.faiss_store.docstore._dict.items():
                         if hasattr(doc, 'metadata') and doc.metadata.get("doc_id") not in exclude_doc_ids:
                             target_docstore_ids.add(docstore_id)
-                #print("ENTER FITLERING MODE:")
-                #print("TARGET DOCSTORE IDS:", target_docstore_ids)
-                #print("NUM OF TARGET DOCSTORE IDS:", len(target_docstore_ids))
+               
                 # Step 2: Build reverse mapping from docstore_id to FAISS index
                 docstore_id_to_faiss_idx = {
                     v: k for k, v in self.faiss_store.index_to_docstore_id.items()
@@ -692,8 +689,7 @@ class VectorDB:
                     search_params
                 )
                 
-                #print("NUM OF RESULTS:", len(indices[0]))
-                #print("INDICES:", indices[0])
+                
                 # Step 9-13: Convert results to VectorEntry format
                 results = []
                 for i in range(len(indices[0])):

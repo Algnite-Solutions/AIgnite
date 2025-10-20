@@ -537,7 +537,7 @@ class PaperIndexer(BaseIndexer):
                 # 将候选doc_ids转换为简化的filter格式
                 #vector_search_candidate_doc_ids = [docid+'_abstract' for docid in candidate_doc_ids]
                 simplified_filters = {"include": {"doc_ids": candidate_doc_ids}}
-                #print(f"Simplified filters: {simplified_filters}")
+                
             else:
                 logger.debug("No filters provided")
             
