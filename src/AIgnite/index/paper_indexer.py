@@ -296,13 +296,12 @@ class PaperIndexer(BaseIndexer):
                 for paper in papers:
                     indexing_status[paper.doc_id]["vectors"] = False
                 return indexing_status
-            
+            else:
+                logger.info(f"Successfully saved vectors for {len(papers)} papers to disk")
             # 保存成功，更新所有成功添加的论文状态
             for paper in papers:
                 # 只有添加成功且保存成功的才标记为 True
                 indexing_status[paper.doc_id]["vectors"] = add_results.get(paper.doc_id, False)
-            
-            logger.info(f"Successfully saved vectors for {len(papers)} papers to disk")
             return indexing_status
             
         except Exception as e:

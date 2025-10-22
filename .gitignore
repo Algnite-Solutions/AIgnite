@@ -2,6 +2,7 @@
 datasets
 experiments/data/
 experiments/outputs/
+experiments/hallucination_test/data/
 test/htmls/
 test/pdfs/
 test/tem/
