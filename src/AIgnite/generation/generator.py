@@ -25,7 +25,7 @@ class GeminiBlogGenerator_default(BaseGenerator):
     TODO: @Qi, replace data_path and output_path with the actual DB_query and DB_write functions.
     """
     def __init__(self, model_name="gemini-2.5-flash-lite-preview-09-2025", data_path="./output", output_path="./experiments/output"):
-        self.client = genai.Client(api_key="AIzaSyCpe6EofJ3bNCkve2wFx8mRUHN19vjxkJY")
+        self.client = genai.Client(api_key=YOUR_GEMINI_API_KEY)
         self.model_name = model_name
         self.data_path = data_path
         self.output_path = output_path
@@ -62,6 +62,7 @@ class GeminiBlogGenerator_default(BaseGenerator):
       2. 使用 Medium 科技博客的写作风格
       3. 引用重要的图表来帮助理解（最多3个）
       4. 直接以博客标题开始，不要添加任何前缀
+      5. 公式请渲染成Latex格式
 
       我将给你一篇论文的详细内容，请为以下论文生成一篇博客文章。
       
@@ -89,6 +90,7 @@ class GeminiBlogGenerator_default(BaseGenerator):
       对于每个图表，使用以下格式：
       ![Figure X: short caption]({self.data_path}/{arxiv_id}_FigureX.png)
 
+      （注意，不要写FigureX，而是原文中真实的Figure号码）
       论文的额外信息（如官方网站、代码、数据集等）可以使用超链接。
         """
         import time
@@ -139,7 +141,7 @@ class GeminiBlogGenerator_recommend(BaseGenerator):
     TODO: @Qi, replace data_path and output_path with the actual DB_query and DB_write functions.
     """
     def __init__(self, model_name="gemini-2.5-flash-preview-09-2025", data_path="./output", output_path="./experiments/output"):
-        self.client = genai.Client(api_key="AIzaSyCpe6EofJ3bNCkve2wFx8mRUHN19vjxkJY")
+        self.client = genai.Client(api_key=YOUR_GEMINI_API_KEY)
         self.model_name = model_name
         self.data_path = data_path
         self.output_path = output_path
@@ -176,7 +178,8 @@ class GeminiBlogGenerator_recommend(BaseGenerator):
       2. 使用 Medium 科技博客的写作风格
       3. 引用重要的图表来帮助理解（最多3个）
       4. 直接以博客标题开始，不要添加任何前缀
-
+      5. 公式请渲染成Latex格式
+      
       我将给你一篇论文的详细内容，请为以下论文生成一篇博客文章。
       
       请确保博客内容：
@@ -203,6 +206,7 @@ class GeminiBlogGenerator_recommend(BaseGenerator):
       对于每个图表，使用以下格式：
       ![Figure X: short caption]({self.data_path}/{arxiv_id}_FigureX.png)
 
+      （注意，不要写FigureX，而是原文中真实的Figure号码）
       论文的额外信息（如官方网站、代码、数据集等）可以使用超链接。
         """
         import time

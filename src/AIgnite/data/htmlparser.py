@@ -311,7 +311,6 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
                     soup = BeautifulSoup(html_content, "html.parser")
 
                     for docset in self.docs:
-                        #print(docset.doc_id, filename[:-5])
                         if docset.doc_id == filename[:-5] and docset.HTML_path is not None:
                             print(f"Processing {docset.doc_id}")
                             figurechunks = self.extract_figures_to_folder(soup,self.image_folder_path,docset.doc_id)
