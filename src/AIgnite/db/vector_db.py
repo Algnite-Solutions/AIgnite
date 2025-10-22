@@ -413,17 +413,11 @@ class VectorDB:
             True if successful, False otherwise
         """
         try:
-            # Check if document already exists
-            '''
-            existing_docs = self.faiss_store.similarity_search(
-                query=vector_db_id,
-                k=1,
-                filter={"vector_db_id": vector_db_id}
-            )
-            if existing_docs:
-                logger.warning(f"Document with vector_db_id {vector_db_id} already exists in vector database. Skip adding.")
+            # Check if document with this ID already exists
+            if vector_db_id in self.faiss_store.docstore._dict:
+                logger.warning(f"Document with vector_db_id {vector_db_id} already exists in vector database. Skipping addition.")
                 return False
-            '''
+            
             # Create Document object
             document = Document(
                 page_content=text_to_emb,
