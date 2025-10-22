@@ -170,6 +170,7 @@ class GritLMEmbeddings(Embeddings):
         Returns:
             Formatted instruction string
         """
+        
         return "<|user|>\n" + instruction + "\n<|embed|>\n" if instruction else "<|embed|>\n"
     
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
@@ -412,17 +413,11 @@ class VectorDB:
             True if successful, False otherwise
         """
         try:
-            # Check if document already exists
-            '''
-            existing_docs = self.faiss_store.similarity_search(
-                query=vector_db_id,
-                k=1,
-                filter={"vector_db_id": vector_db_id}
-            )
-            if existing_docs:
-                logger.warning(f"Document with vector_db_id {vector_db_id} already exists in vector database. Skip adding.")
+            # Check if document with this ID already exists
+            if vector_db_id in self.faiss_store.docstore._dict:
+                logger.warning(f"Document with vector_db_id {vector_db_id} already exists in vector database. Skipping addition.")
                 return False
-            '''
+            
             # Create Document object
             document = Document(
                 page_content=text_to_emb,
@@ -619,44 +614,119 @@ class VectorDB:
             List of tuples containing (VectorEntry, similarity_score)
         """
         try:
-            # Prepare filter for LangChain FAISS
-            faiss_filter = None
-            if filters:
-                # Convert filters to FAISS format
+            # Check if we need to use FAISS native filtering
+            if filters and ("include" in filters or "exclude" in filters):
+                # FILTERED SEARCH PATH: Use FAISS IDSelector
+                
+                # Step 1: Collect target docstore_ids based on filter
+                target_docstore_ids = set()
+                
                 if "include" in filters and "doc_ids" in filters["include"]:
-                    faiss_filter = {"doc_id": filters["include"]["doc_ids"]}
+                    # Include mode: collect docstore_ids matching the doc_ids
+                    filter_doc_ids = set(filters["include"]["doc_ids"])
+                    for docstore_id, doc in self.faiss_store.docstore._dict.items():
+                        if hasattr(doc, 'metadata') and doc.metadata.get("doc_id") in filter_doc_ids:
+                            target_docstore_ids.add(docstore_id)
+                
                 elif "exclude" in filters and "doc_ids" in filters["exclude"]:
-                    faiss_filter = {"doc_id": {"$nin": filters["exclude"]["doc_ids"]}}
-                else:
-                    # FAISS doesn't support list filters directly, we'll handle this in post-processing
-                    pass
-                print(f"faiss_filter: {faiss_filter}")
-            # Perform similarity search with scores
-            docs_with_scores = self.faiss_store.similarity_search_with_score(
-                query=query,
-                k=top_k * 5,  # Get more results to account for filtering
-                filter=faiss_filter
-            )
-            print('result before filters:', len(docs_with_scores))
-            # Convert to VectorEntry format and apply additional filters
-            results = []
-            for doc, score in docs_with_scores:
-                entry = self._document_to_vector_entry(doc)
+                    # Exclude mode: collect all docstore_ids except those matching doc_ids
+                    exclude_doc_ids = set(filters["exclude"]["doc_ids"])
+                    for docstore_id, doc in self.faiss_store.docstore._dict.items():
+                        if hasattr(doc, 'metadata') and doc.metadata.get("doc_id") not in exclude_doc_ids:
+                            target_docstore_ids.add(docstore_id)
+               
+                # Step 2: Build reverse mapping from docstore_id to FAISS index
+                docstore_id_to_faiss_idx = {
+                    v: k for k, v in self.faiss_store.index_to_docstore_id.items()
+                }
                 
-                # Convert distance score to similarity score (higher = more similar)
-                # For L2 normalized vectors, the distance range is [0, 2]
-                # Linear conversion: similarity = 1 - distance/2
+                # Step 3: Convert docstore_ids to FAISS numerical indices
+                faiss_indices = []
+                for ds_id in target_docstore_ids:
+                    if ds_id in docstore_id_to_faiss_idx:
+                        faiss_indices.append(docstore_id_to_faiss_idx[ds_id])
+                
+                # Step 4: Handle empty filter result
+                if not faiss_indices:
+                    logger.warning("Filter resulted in empty ID set, returning empty results")
+                    return []
+                
+                # Step 5: Create IDSelector using FAISS built-in types
+                # Convert to sorted numpy array for IDSelectorArray
+                faiss_indices_array = np.array(sorted(faiss_indices), dtype=np.int64)
+                
+                if "include" in filters:
+                    # Include mode: use IDSelectorArray directly
+                    selector = faiss.IDSelectorArray(len(faiss_indices_array), faiss.swig_ptr(faiss_indices_array))
+                else:  # exclude
+                    # Exclude mode: wrap IDSelectorArray with NOT
+                    base_selector = faiss.IDSelectorArray(len(faiss_indices_array), faiss.swig_ptr(faiss_indices_array))
+                    selector = faiss.IDSelectorNot(base_selector)
+                
+                # Step 6: Get query embedding
+                query_vector = self.embeddings.embed_query(query)
+                query_vector = np.array([query_vector], dtype=np.float32)
+                
+                # Step 7: Create SearchParameters with selector
+                search_params = faiss.SearchParameters()
+                search_params.sel = selector
+                
+                # Step 8: Execute filtered search using search_c (low-level API)
+                distances = np.zeros((query_vector.shape[0], top_k), dtype=np.float32)
+                indices = np.zeros((query_vector.shape[0], top_k), dtype=np.int64)
+                self.faiss_store.index.search_c(
+                    query_vector.shape[0],
+                    faiss.swig_ptr(query_vector),
+                    top_k,
+                    faiss.swig_ptr(distances),
+                    faiss.swig_ptr(indices),
+                    search_params
+                )
                 
                 
-                results.append((entry, score))
-            
-            print('result after filters:', len(results))
-            
-            # Sort by similarity score (higher similarity first)
-            #results.sort(key=lambda x: x[1])
-            
-            # Return top k results
-            return results[:top_k]
+                # Step 9-13: Convert results to VectorEntry format
+                results = []
+                for i in range(len(indices[0])):
+                    faiss_idx = indices[0][i]
+                    distance = distances[0][i]
+                    
+                    # Skip invalid indices
+                    if faiss_idx == -1:
+                        continue
+                    
+                    # Get docstore_id
+                    docstore_id = self.faiss_store.index_to_docstore_id.get(faiss_idx)
+                    if not docstore_id:
+                        continue
+                    
+                    # Get Document
+                    doc = self.faiss_store.docstore._dict.get(docstore_id)
+                    if not doc:
+                        continue
+                    
+                    # Convert to VectorEntry
+                    entry = self._document_to_vector_entry(doc)
+                    
+                    # For normalized vectors with inner product, distance is similarity
+                    similarity_score = float(distance)
+                    
+                    results.append((entry, similarity_score))
+                
+                return results
+                
+            else:
+                # NO FILTER PATH: Use LangChain wrapper directly
+                docs_with_scores = self.faiss_store.similarity_search_with_score(
+                    query=query,
+                    k=top_k
+                )
+                
+                results = []
+                for doc, score in docs_with_scores:
+                    entry = self._document_to_vector_entry(doc)
+                    results.append((entry, score))
+                
+                return results
             
         except Exception as e:
             logger.error(f"Search failed: {str(e)}")
