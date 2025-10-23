@@ -94,7 +94,7 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
 
         search = arxiv.Search(
             query=query,
-            max_results=None,  # You can set max papers you want here
+            max_results=1,  # You can set max papers you want here
             sort_by=arxiv.SortCriterion.SubmittedDate
         )
         #print('only 3 papers')
