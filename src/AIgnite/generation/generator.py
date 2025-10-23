@@ -92,6 +92,13 @@ class GeminiBlogGenerator_default(BaseGenerator):
 
       （注意，不要写FigureX，而是原文中真实的Figure号码）
       论文的额外信息（如官方网站、代码、数据集等）可以使用超链接。
+
+      
+      下面是论文原文：
+      {paper.text_chunks}
+      下面是文中用到的图表，你的图表来源必须来自以下这些：
+      {paper.table_chunks},
+      {paper.figure_chunks}
         """
         import time
 
@@ -102,10 +109,10 @@ class GeminiBlogGenerator_default(BaseGenerator):
                     model=self.model_name,
                     contents=[
                         prompt,
-                        types.Part.from_bytes(
+                        ''' types.Part.from_bytes(
                             data=pdf_data,
                             mime_type='application/pdf',
-                        ),
+                        ),'''
                     ]
                 )
                 break  # 成功就跳出循环
@@ -208,6 +215,12 @@ class GeminiBlogGenerator_recommend(BaseGenerator):
 
       （注意，不要写FigureX，而是原文中真实的Figure号码）
       论文的额外信息（如官方网站、代码、数据集等）可以使用超链接。
+
+      下面是论文原文：
+      {paper.text_chunks}
+      下面是文中用到的图表，你的图表来源必须来自以下这些：
+      {paper.table_chunks},
+      {paper.figure_chunks}
         """
         import time
 
@@ -218,10 +231,10 @@ class GeminiBlogGenerator_recommend(BaseGenerator):
                     model=self.model_name,
                     contents=[
                         prompt,
-                        types.Part.from_bytes(
+                        ''' types.Part.from_bytes(
                             data=pdf_data,
                             mime_type='application/pdf',
-                        ),
+                        ),'''
                     ]
                 )
                 break  # 成功就跳出循环
@@ -249,9 +262,6 @@ class GeminiBlogGenerator_recommend(BaseGenerator):
 
         print(f"✅ Markdown file saved to {markdown_path}")
         print("📊 Token usage:", response.usage_metadata.prompt_token_count, response.usage_metadata.candidates_token_count)
-
-
-
 
 class AsyncvLLMGenerator:
     def __init__(self, model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-8B", api_base="http://localhost:8000/v1",data_path="./output", output_path="./experiments/output"):

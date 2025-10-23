@@ -3,7 +3,7 @@ import os
 from openai import OpenAI
 
 client = OpenAI(
-    api_key="sk-7d1b4bfa589c45f9a352d3e22623eec1",
+    api_key=YOUR_DEEPSEEK_API_KEY,
     base_url="https://api.deepseek.com")
 
 def chat_deepseek(prompt):

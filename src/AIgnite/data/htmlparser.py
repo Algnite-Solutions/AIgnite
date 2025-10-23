@@ -2,7 +2,7 @@ from bs4 import BeautifulSoup
 from .docset import DocSet, TextChunk, FigureChunk, TableChunk, ChunkType
 from .pdfparser import *
 from pathlib import Path
-#new
+
 from datetime import datetime, timezone, timedelta
 import arxiv
 import os
@@ -16,8 +16,6 @@ import re
 from typing import List, Tuple
 import base64
 from volcengine.visual.VisualService import VisualService
-from spire.pdf.common import *
-from spire.pdf import *
 from abc import ABC, abstractmethod
 
 class BaseHTMLExtractor(ABC):
@@ -97,7 +95,7 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
             max_results=None,  # You can set max papers you want here
             sort_by=arxiv.SortCriterion.SubmittedDate
         )
-        #print('only 3 papers')
+
         print(f"grabbing arXiv papers in cs.* submitted from {self.start_time} to {self.end_time}......")
 
         # Test if we have extracted already or not. Download pdf and try to download html
