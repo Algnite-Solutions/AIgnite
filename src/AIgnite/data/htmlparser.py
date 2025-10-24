@@ -22,7 +22,7 @@ from abc import ABC, abstractmethod
 
 class BaseHTMLExtractor(ABC):
     """Abstract base classes of the HTML extractor"""
-    def __init__(self, html_text_folder, pdf_folder_path, arxiv_pool, image_folder_path, json_path, volcengine_ak, volcengine_sk, start_time, end_time):
+    def __init__(self, html_text_folder, pdf_folder_path, arxiv_pool, image_folder_path, json_path, volcengine_ak, volcengine_sk, start_time, end_time, max_results):
         '''
         Args:
         html_text_folder: the folder path used to store the .html file.
@@ -46,6 +46,7 @@ class BaseHTMLExtractor(ABC):
         self.end_time = end_time
         #Helper
         self.pdf_parser_helper = ArxivPDFExtractor(self.docs, pdf_folder_path, image_folder_path, arxiv_pool, json_path, volcengine_ak, volcengine_sk, start_time, end_time)
+        self.max_results = max_results
 
     @abstractmethod
     def extract_all_htmls(self) -> DocSet:
@@ -94,7 +95,7 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
 
         search = arxiv.Search(
             query=query,
-            max_results=1,  # You can set max papers you want here
+            max_results=self.max_results,  # You can set max papers you want here
             sort_by=arxiv.SortCriterion.SubmittedDate
         )
         #print('only 3 papers')
@@ -318,6 +319,35 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
                             docset.figure_chunks = figurechunks
                             docset.table_chunks = table_chunks
                             docset.text_chunks = self.extract_text(soup)
+                            
+                            # 调试信息：检查每个字段是否为空并打印前50个字符
+                            print(f"=== 调试信息 - {docset.doc_id} ===")
+                            
+                            # 检查 figure_chunks
+                            if docset.figure_chunks is not None and len(docset.figure_chunks) > 0:
+                                print(f"✅ figure_chunks: 有 {len(docset.figure_chunks)} 个元素")
+                                for i, chunk in enumerate(docset.figure_chunks[:3]):  # 只显示前3个
+                                    print(f"  Figure {i+1}: {str(chunk)[:50]}...")
+                            else:
+                                print("❌ figure_chunks: 为空或None")
+                            
+                            # 检查 table_chunks
+                            if docset.table_chunks is not None and len(docset.table_chunks) > 0:
+                                print(f"✅ table_chunks: 有 {len(docset.table_chunks)} 个元素")
+                                for i, chunk in enumerate(docset.table_chunks[:3]):  # 只显示前3个
+                                    print(f"  Table {i+1}: {str(chunk)[:50]}...")
+                            else:
+                                print("❌ table_chunks: 为空或None")
+                            
+                            # 检查 text_chunks
+                            if docset.text_chunks is not None and len(docset.text_chunks) > 0:
+                                print(f"✅ text_chunks: 有 {len(docset.text_chunks)} 个元素")
+                                for i, chunk in enumerate(docset.text_chunks[:3]):  # 只显示前3个
+                                    print(f"  Text {i+1}: {str(chunk)[:50]}...")
+                            else:
+                                print("❌ text_chunks: 为空或None")
+                            
+                            print("=" * 50)
         
         '''self.pdf_parser_helper.docs = self.docs
         self.pdf_parser_helper.remain_docparser()

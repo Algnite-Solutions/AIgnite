@@ -8,6 +8,7 @@ from google.genai import types
 from AIgnite.data.docset import DocSet
 from tqdm import tqdm
 import time
+from .prompt_config import format_blog_prompt
 
 class BaseGenerator(ABC):
     """
@@ -25,7 +26,7 @@ class GeminiBlogGenerator_default(BaseGenerator):
     TODO: @Qi, replace data_path and output_path with the actual DB_query and DB_write functions.
     """
     def __init__(self, model_name="gemini-2.5-flash-lite-preview-09-2025", data_path="./output", output_path="./experiments/output"):
-        self.client = genai.Client(api_key=YOUR_GEMINI_API_KEY)
+        self.client = genai.Client(api_key="AIzaSyCpe6EofJ3bNCkve2wFx8mRUHN19vjxkJY")
         self.model_name = model_name
         self.data_path = data_path
         self.output_path = output_path
@@ -55,51 +56,13 @@ class GeminiBlogGenerator_default(BaseGenerator):
             pdf_data = pdf_file.read()
 
         arxiv_id = paper.doc_id
-        prompt = f"""
-        你是一个专业的科技博客作者，专门为中国的研究人员撰写学术论文的中文博客总结。
-      你的任务是：
-      1. 突出论文的核心贡献和创新点
-      2. 使用 Medium 科技博客的写作风格
-      3. 引用重要的图表来帮助理解（最多3个）
-      4. 直接以博客标题开始，不要添加任何前缀
-      5. 公式请渲染成Latex格式
-
-      我将给你一篇论文的详细内容，请为以下论文生成一篇博客文章。
-      
-      请确保博客内容：
-      - 结构清晰，逻辑连贯，尽量详细一些，不要过于简略
-      - 在博客前几部分突出论文的核心贡献，符合新闻学博人眼球的风格
-      - 重点介绍文章的比较重要的方法，并且引用pipeline图，并且给出pipeline图的解释
-      - 适合研究人员阅读，但不要晦涩难懂，在必要的地方可以适当解释复杂的名词概念
-
-      请使用小标题。你最好可以根据文章实际内容确定一些针对本篇文章特有的小标题。不要设置层次过多的小标题。
-      最好可以在开头有吸引人的小标题
-      最好小标题具有强大的概括能力，显得很精辟
-      如果你实在没有灵感的话，你可以参考的小标题：
-      - 概述介绍
-      - 理论框架和定义
-      - 核心方法
-      - 实验设计
-      - 应用场景及评估
-      - 未来发展方向和开放性挑战
-      - 相关引文
-      - 相关链接
-
-      注意事项：
-      如果论文包含图表，请选择重要的图表（尤其是表示pipeline的图）进行引用。
-      对于每个图表，使用以下格式：
-      ![Figure X: short caption]({self.data_path}/{arxiv_id}_FigureX.png)
-
-      （注意，不要写FigureX，而是原文中真实的Figure号码）
-      论文的额外信息（如官方网站、代码、数据集等）可以使用超链接。
-
-      
-      下面是论文原文：
-      {paper.text_chunks}
-      下面是文中用到的图表，你的图表来源必须来自以下这些：
-      {paper.table_chunks},
-      {paper.figure_chunks}
-        """
+        prompt = format_blog_prompt(
+            data_path=self.data_path,
+            arxiv_id=arxiv_id,
+            text_chunks=paper.text_chunks,
+            table_chunks=paper.table_chunks,
+            figure_chunks=paper.figure_chunks
+        )
         import time
 
         max_retries = 5
@@ -148,7 +111,7 @@ class GeminiBlogGenerator_recommend(BaseGenerator):
     TODO: @Qi, replace data_path and output_path with the actual DB_query and DB_write functions.
     """
     def __init__(self, model_name="gemini-2.5-flash-preview-09-2025", data_path="./output", output_path="./experiments/output"):
-        self.client = genai.Client(api_key=YOUR_GEMINI_API_KEY)
+        self.client = genai.Client(api_key="AIzaSyCpe6EofJ3bNCkve2wFx8mRUHN19vjxkJY")
         self.model_name = model_name
         self.data_path = data_path
         self.output_path = output_path
@@ -178,50 +141,13 @@ class GeminiBlogGenerator_recommend(BaseGenerator):
             pdf_data = pdf_file.read()
 
         arxiv_id = paper.doc_id
-        prompt = f"""
-        你是一个专业的科技博客作者，专门为中国的研究人员撰写学术论文的中文博客总结。
-      你的任务是：
-      1. 突出论文的核心贡献和创新点
-      2. 使用 Medium 科技博客的写作风格
-      3. 引用重要的图表来帮助理解（最多3个）
-      4. 直接以博客标题开始，不要添加任何前缀
-      5. 公式请渲染成Latex格式
-      
-      我将给你一篇论文的详细内容，请为以下论文生成一篇博客文章。
-      
-      请确保博客内容：
-      - 结构清晰，逻辑连贯，尽量详细一些，不要过于简略
-      - 在博客前几部分突出论文的核心贡献，符合新闻学博人眼球的风格
-      - 重点介绍文章的比较重要的方法，并且引用pipeline图，并且给出pipeline图的解释
-      - 适合研究人员阅读，但不要晦涩难懂，在必要的地方可以适当解释复杂的名词概念
-
-      请使用小标题。你最好可以根据文章实际内容确定一些针对本篇文章特有的小标题。不要设置层次过多的小标题。
-      最好可以在开头有吸引人的小标题
-      最好小标题具有强大的概括能力，显得很精辟
-      如果你实在没有灵感的话，你可以参考的小标题：
-      - 概述介绍
-      - 理论框架和定义
-      - 核心方法
-      - 实验设计
-      - 应用场景及评估
-      - 未来发展方向和开放性挑战
-      - 相关引文
-      - 相关链接
-
-      注意事项：
-      如果论文包含图表，请选择重要的图表（尤其是表示pipeline的图）进行引用。
-      对于每个图表，使用以下格式：
-      ![Figure X: short caption]({self.data_path}/{arxiv_id}_FigureX.png)
-
-      （注意，不要写FigureX，而是原文中真实的Figure号码）
-      论文的额外信息（如官方网站、代码、数据集等）可以使用超链接。
-
-      下面是论文原文：
-      {paper.text_chunks}
-      下面是文中用到的图表，你的图表来源必须来自以下这些：
-      {paper.table_chunks},
-      {paper.figure_chunks}
-        """
+        prompt = format_blog_prompt(
+            data_path=self.data_path,
+            arxiv_id=arxiv_id,
+            text_chunks=paper.text_chunks,
+            table_chunks=paper.table_chunks,
+            figure_chunks=paper.figure_chunks
+        )
         import time
 
         max_retries = 5

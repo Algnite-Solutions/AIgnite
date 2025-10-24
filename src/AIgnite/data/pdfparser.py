@@ -563,13 +563,28 @@ def get_pdf_md(path,store_path,name,ak,sk):
     # 请求
     try:
         resp = visual_service.ocr_pdf(form)
-        if not resp or "data" not in resp:
-            print("❌ OCR请求失败：响应格式不正确")
+        
+        # 增强错误处理
+        if resp is None:
+            print("❌ OCR请求失败：服务返回空响应")
+            return None
+            
+        if not isinstance(resp, dict):
+            print(f"❌ OCR请求失败：响应类型错误，期望dict，实际{type(resp)}")
+            return None
+            
+        if "data" not in resp:
+            print(f"❌ OCR请求失败：响应中缺少'data'字段，实际字段: {list(resp.keys())}")
+            return None
+            
+        if resp["data"] is None:
+            print("❌ OCR请求失败：data字段为None")
             return None
             
         markdown = resp["data"].get("markdown")
         if not markdown:
             print("❌ OCR请求失败：未获取到markdown内容")
+            print(f"响应data内容: {resp['data']}")
             return None
 
         # 确保目录存在
