@@ -26,7 +26,7 @@ class GeminiBlogGenerator_default(BaseGenerator):
     TODO: @Qi, replace data_path and output_path with the actual DB_query and DB_write functions.
     """
     def __init__(self, model_name="gemini-2.5-flash-lite-preview-09-2025", data_path="./output", output_path="./experiments/output"):
-        self.client = genai.Client(api_key="AIzaSyCpe6EofJ3bNCkve2wFx8mRUHN19vjxkJY")
+        self.client = genai.Client(api_key=your api key)
         self.model_name = model_name
         self.data_path = data_path
         self.output_path = output_path
@@ -111,7 +111,7 @@ class GeminiBlogGenerator_recommend(BaseGenerator):
     TODO: @Qi, replace data_path and output_path with the actual DB_query and DB_write functions.
     """
     def __init__(self, model_name="gemini-2.5-flash-preview-09-2025", data_path="./output", output_path="./experiments/output"):
-        self.client = genai.Client(api_key="AIzaSyCpe6EofJ3bNCkve2wFx8mRUHN19vjxkJY")
+        self.client = genai.Client(api_key=your api key)
         self.model_name = model_name
         self.data_path = data_path
         self.output_path = output_path
