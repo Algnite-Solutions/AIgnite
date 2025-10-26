@@ -495,29 +495,49 @@ class PaperIndexer(BaseIndexer):
     def find_similar_papers(
         self, 
         query: str, 
-        top_k: int = 5, 
+        top_k: int = 5,
+        retrieve_k: int=100,
         filters: Optional[Dict[str, Any]] = None,
         search_strategies: List[Tuple[SearchStrategy, float]] = None,
         result_include_types: Optional[List[str]] = None
-    ) -> List[Dict[str, Any]]:
+    ):
         """Find papers similar to the query using the selected search strategy.
         
         Args:
             query: Search query string
-            top_k: Number of results to return
+            top_k: Number of results to return for recommendation
+            retrieve_k: Optional number of results for retrieval (for reranking debug). 
+                       Default is 100.
             filters: Optional filters to apply to the search
             search_strategies: List of search strategies and their thresholds
             result_include_types: Optional list of data types to include in results
             
         Returns:
-            combine_results: The combined results according to the include_types and search results
-            search_results: The original search results
+            If retrieve_k is None: List of dictionaries (backward compatible)
+            If retrieve_k is provided: Dictionary with structure:
+                {
+                    "top_k_results": List[Dict[str, Any]],
+                    "retrieve_results": List[Dict[str, Any]],
+                    "metadata": {
+                        "top_k": int,
+                        "retrieve_k": int,
+                        "query": str,
+                        "strategy": str
+                    }
+                }
             
         Raises:
             ValueError: If no search strategy is available or required database is missing
         """
         try:
+            if not retrieve_k:
+                retrieve_k = 100
+            print('RETRIEVE_K:', retrieve_k)
+
             logger.debug(f"Searching for query: {query}, filters: {filters is not None}")
+            
+            # 确定实际搜索数量
+            actual_search_k = retrieve_k if retrieve_k is not None else top_k
             
             # 1. 预过滤：如果有filters，先通过metadata_db获取候选doc_ids
             if filters and self.metadata_db is None:
@@ -529,6 +549,18 @@ class PaperIndexer(BaseIndexer):
                 
                 if not candidate_doc_ids:
                     logger.info("No documents match the filters, returning empty results")
+                    # 返回空结果，格式根据是否提供 retrieve_k 决定
+                    if retrieve_k is not None:
+                        return {
+                            "top_k_results": [],
+                            "retrieve_results": [],
+                            "metadata": {
+                                "top_k": top_k,
+                                "retrieve_k": retrieve_k,
+                                "query": query,
+                                "strategy": search_strategies[0][0] if search_strategies else "unknown"
+                            }
+                        }
                     return []
                 
                 logger.info(f"Filter applied: {len(candidate_doc_ids)} candidate documents")
@@ -540,26 +572,55 @@ class PaperIndexer(BaseIndexer):
             else:
                 logger.debug("No filters provided")
             
-            # 2. 执行搜索（使用简化后的filters）
-            search_results = self._execute_search(query, top_k, simplified_filters, search_strategies)
+            # 2. 执行搜索（使用 actual_search_k）
+            search_results = self._execute_search(query, actual_search_k, simplified_filters, search_strategies)
             
             if not search_results:
                 logger.debug("No search results found")
+                if retrieve_k is not None:
+                    return {
+                        "top_k_results": [],
+                        "retrieve_results": [],
+                        "metadata": {
+                            "top_k": top_k,
+                            "retrieve_k": retrieve_k,
+                            "query": query,
+                            "strategy": search_strategies[0][0] if search_strategies else "unknown"
+                        }
+                    }
                 return []
             
-            # 2. 获取doc_ids
+            # 3. 获取doc_ids（根据 actual_search_k）
             doc_ids = [result.doc_id for result in search_results]
-            logger.debug(f"Found {len(doc_ids)} documents: {doc_ids}")
+            logger.debug(f"Found {len(doc_ids)} documents")
             
-            # 3. 获取数据
+            # 4. 获取数据
             data_dict = {}
             for data_type in result_include_types or ["metadata"]:
                 if data_type != "search_parameters":
                     data_dict[data_type] = self.data_retriever.get_data_by_type(doc_ids, data_type)
             
-            # 4. 合并结果
-            combine_results= self.result_combiner.combine(search_results, data_dict, result_include_types or ["metadata"])
-            return combine_results
+            # 5. 合并结果
+            combine_results = self.result_combiner.combine(
+                search_results, 
+                data_dict, 
+                result_include_types or ["metadata"]
+            )
+            
+            # 6. 根据是否提供 retrieve_k 决定返回格式
+
+                # 返回扩展格式
+            top_k_results = combine_results[:top_k]
+            return {
+                "top_k_results": top_k_results,
+                "retrieve_results": combine_results,  # 完整的 retrieve_k 结果
+                "metadata": {
+                    "top_k": top_k,
+                    "retrieve_k": retrieve_k,
+                    "query": query,
+                    "strategy": search_strategies[0][0] if search_strategies else "unknown"
+                }
+            }
             
         except Exception as e:
             logger.error(f"Failed to find similar papers: {str(e)}")
