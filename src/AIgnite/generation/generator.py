@@ -3,11 +3,77 @@ import asyncio
 import aiohttp
 from typing import List
 import os
+import yaml
 from google import genai
 from google.genai import types
 from AIgnite.data.docset import DocSet
 from tqdm import tqdm
 import time
+
+# 缓存配置
+_PROMPT_CONFIGS = {}
+
+def _load_prompt_config(input_format: str = "pdf"):
+    """
+    根据输入格式加载prompt配置
+    
+    Args:
+        input_format: 输入格式，'pdf' 或 'text'
+    
+    Returns:
+        prompt配置字典
+    """
+    if input_format in _PROMPT_CONFIGS:
+        return _PROMPT_CONFIGS[input_format]
+    
+    if input_format == "pdf":
+        config_file = "pdf_prompts.yaml"
+    elif input_format == "text":
+        config_file = "text_prompts.yaml"
+    else:
+        raise ValueError(f"不支持的输入格式: {input_format}，应为 'pdf' 或 'text'")
+    
+    config_path = os.path.join(os.path.dirname(__file__), config_file)
+    with open(config_path, 'r', encoding='utf-8') as f:
+        _PROMPT_CONFIGS[input_format] = yaml.safe_load(f)
+    
+    return _PROMPT_CONFIGS[input_format]
+
+def format_blog_prompt(data_path: str, arxiv_id: str, text_chunks: str, table_chunks: str, figure_chunks: str, title: str, input_format: str = "pdf") -> str:
+    """
+    格式化博客生成prompt
+    
+    Args:
+        data_path: 数据路径
+        arxiv_id: 论文ID
+        text_chunks: 文本块
+        table_chunks: 表格块
+        figure_chunks: 图表块
+        title: 论文标题
+        input_format: 输入格式，'pdf' 或 'text'，默认为 'pdf'
+    
+    Returns:
+        格式化后的prompt
+    """
+    config = _load_prompt_config(input_format)
+    
+    # PDF模式只需要基本信息，文本模式需要所有信息
+    if input_format == "pdf":
+        return config['blog_generation_prompt'].format(
+            data_path=data_path,
+            arxiv_id=arxiv_id,
+            figure_chunks=figure_chunks,
+            title=title
+        )
+    else:
+        return config['blog_generation_prompt'].format(
+            data_path=data_path,
+            arxiv_id=arxiv_id,
+            text_chunks=text_chunks,
+            table_chunks=table_chunks,
+            figure_chunks=figure_chunks,
+            title=title
+        )
 
 class BaseGenerator(ABC):
     """
@@ -24,18 +90,22 @@ class GeminiBlogGenerator_default(BaseGenerator):
     This class uses the Google Gemini model to generate blog posts based on the provided PDF documents.
     TODO: @Qi, replace data_path and output_path with the actual DB_query and DB_write functions.
     """
-    def __init__(self, model_name="gemini-2.5-flash-lite-preview-09-2025", data_path="./output", output_path="./experiments/output"):
-        self.client = genai.Client(api_key=YOUR_GEMINI_API_KEY)
+    def __init__(self, model_name="gemini-2.5-flash-lite-preview-09-2025", data_path="./output", output_path="./experiments/output", input_format="pdf"):
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY environment variable is not set")
+        self.client = genai.Client(api_key=api_key)
         self.model_name = model_name
         self.data_path = data_path
         self.output_path = output_path
+        self.input_format = input_format
 
-    def generate_digest(self, papers: List[DocSet]):
+    def generate_digest(self, papers: List[DocSet], input_format="pdf"):
         import concurrent.futures
         import threading
         
         def generate_with_delay(paper):
-            self._generate_single_blog(paper)
+            self._generate_single_blog(paper, input_format)
             time.sleep(5)
         
         # 使用线程池进行并行处理，限制最大并发数避免API限制
@@ -49,71 +119,40 @@ class GeminiBlogGenerator_default(BaseGenerator):
                 except Exception as e:
                     print(f"处理论文时出错: {e}")
 
-    def _generate_single_blog(self, paper: DocSet):
-        # Read and encode the PDF bytes
-        with open(paper.pdf_path, "rb") as pdf_file:
-            pdf_data = pdf_file.read()
+    def _generate_single_blog(self, paper: DocSet, input_format="pdf"):
+        # Read and encode the PDF bytes only if input_format is pdf
+        if input_format == "pdf":
+            with open(paper.pdf_path, "rb") as pdf_file:
+                pdf_data = pdf_file.read()
 
         arxiv_id = paper.doc_id
-        prompt = f"""
-        你是一个专业的科技博客作者，专门为中国的研究人员撰写学术论文的中文博客总结。
-      你的任务是：
-      1. 突出论文的核心贡献和创新点
-      2. 使用 Medium 科技博客的写作风格
-      3. 引用重要的图表来帮助理解（最多3个）
-      4. 直接以博客标题开始，不要添加任何前缀
-      5. 公式请渲染成Latex格式
-
-      我将给你一篇论文的详细内容，请为以下论文生成一篇博客文章。
-      
-      请确保博客内容：
-      - 结构清晰，逻辑连贯，尽量详细一些，不要过于简略
-      - 在博客前几部分突出论文的核心贡献，符合新闻学博人眼球的风格
-      - 重点介绍文章的比较重要的方法，并且引用pipeline图，并且给出pipeline图的解释
-      - 适合研究人员阅读，但不要晦涩难懂，在必要的地方可以适当解释复杂的名词概念
-
-      请使用小标题。你最好可以根据文章实际内容确定一些针对本篇文章特有的小标题。不要设置层次过多的小标题。
-      最好可以在开头有吸引人的小标题
-      最好小标题具有强大的概括能力，显得很精辟
-      如果你实在没有灵感的话，你可以参考的小标题：
-      - 概述介绍
-      - 理论框架和定义
-      - 核心方法
-      - 实验设计
-      - 应用场景及评估
-      - 未来发展方向和开放性挑战
-      - 相关引文
-      - 相关链接
-
-      注意事项：
-      如果论文包含图表，请选择重要的图表（尤其是表示pipeline的图）进行引用。
-      对于每个图表，使用以下格式：
-      ![Figure X: short caption]({self.data_path}/{arxiv_id}_FigureX.png)
-
-      （注意，不要写FigureX，而是原文中真实的Figure号码）
-      论文的额外信息（如官方网站、代码、数据集等）可以使用超链接。
-
-      
-      下面是论文原文：
-      {paper.text_chunks}
-      下面是文中用到的图表，你的图表来源必须来自以下这些：
-      {paper.table_chunks},
-      {paper.figure_chunks}
-        """
+        prompt = format_blog_prompt(
+            data_path=self.data_path,
+            arxiv_id=arxiv_id,
+            text_chunks=paper.text_chunks,
+            table_chunks=paper.table_chunks,
+            figure_chunks=paper.figure_chunks,
+            title=paper.title,
+            input_format=input_format
+        )
         import time
 
         max_retries = 5
         for attempt in range(1, max_retries + 1):
             try:
-                response = self.client.models.generate_content(
-                    model=self.model_name,
-                    contents=[
-                        prompt,
-                        ''' types.Part.from_bytes(
+                # Build contents list based on input_format
+                contents = [prompt]
+                if input_format == "pdf":
+                    contents.append(
+                        types.Part.from_bytes(
                             data=pdf_data,
                             mime_type='application/pdf',
-                        ),'''
-                    ]
+                        )
+                    )
+                
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=contents
                 )
                 break  # 成功就跳出循环
             except Exception as e:
@@ -125,13 +164,6 @@ class GeminiBlogGenerator_default(BaseGenerator):
                 else:
                     print("已达到最大重试次数，终止。")
                     return
-
-        """
-        types.Part.from_bytes(
-                    data=pdf_data,
-                    mime_type='application/pdf',
-                ),
-        """
 
         markdown_path = os.path.join(self.output_path, f"{arxiv_id}.md")
         os.makedirs(os.path.dirname(markdown_path), exist_ok=True)  # 确保目录存在
@@ -147,95 +179,81 @@ class GeminiBlogGenerator_recommend(BaseGenerator):
     This class uses the Google Gemini model to generate blog posts based on the provided PDF documents.
     TODO: @Qi, replace data_path and output_path with the actual DB_query and DB_write functions.
     """
-    def __init__(self, model_name="gemini-2.5-flash-preview-09-2025", data_path="./output", output_path="./experiments/output"):
-        self.client = genai.Client(api_key=YOUR_GEMINI_API_KEY)
+    def __init__(self, model_name="gemini-2.5-flash-preview-09-2025", data_path="./output", output_path="./experiments/output", input_format="pdf"):
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY environment variable is not set")
+        self.client = genai.Client(api_key=api_key)
         self.model_name = model_name
         self.data_path = data_path
         self.output_path = output_path
+        self.input_format = input_format
 
-    def generate_digest(self, papers: List[DocSet]):
+    def generate_digest(self, papers: List[DocSet], input_format="pdf"):
         import concurrent.futures
         import threading
         
         def generate_with_delay(paper):
-            self._generate_single_blog(paper)
+            self._generate_single_blog(paper, input_format)
             time.sleep(5)
         
         # 使用线程池进行并行处理，限制最大并发数避免API限制
         max_workers = min(len(papers), 50)  # 最多50个并发任务
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(generate_with_delay, paper) for paper in papers]
-            # 等待所有任务完成
-            for future in concurrent.futures.as_completed(futures):
+            # 保持输入顺序：提交任务并保存映射
+            paper_to_future = {i: (paper, executor.submit(generate_with_delay, paper)) 
+                               for i, paper in enumerate(papers)}
+            
+            # 按照输入顺序等待任务完成，确保博客文件顺序与论文列表一致
+            for i in range(len(papers)):
+                paper, future = paper_to_future[i]
                 try:
                     future.result()
                 except Exception as e:
-                    print(f"处理论文时出错: {e}")
+                    print(f"处理论文 {paper.doc_id} 时出错: {e}")
 
-    def _generate_single_blog(self, paper: DocSet):
-        # Read and encode the PDF bytes
-        with open(paper.pdf_path, "rb") as pdf_file:
-            pdf_data = pdf_file.read()
+    def _generate_single_blog(self, paper: DocSet, input_format="pdf"):
+        # Debug: print paper information
+        print(f"📄 正在生成博客 - 论文ID: {paper.doc_id}")
+        print(f"📄 论文标题: {paper.title[:100]}...")
+        print(f"📄 PDF路径: {paper.pdf_path}")
+        print(f"📄 输入格式: {input_format}")
+        
+        # Read and encode the PDF bytes only if input_format is pdf
+        if input_format == "pdf":
+            with open(paper.pdf_path, "rb") as pdf_file:
+                pdf_data = pdf_file.read()
 
         arxiv_id = paper.doc_id
-        prompt = f"""
-        你是一个专业的科技博客作者，专门为中国的研究人员撰写学术论文的中文博客总结。
-      你的任务是：
-      1. 突出论文的核心贡献和创新点
-      2. 使用 Medium 科技博客的写作风格
-      3. 引用重要的图表来帮助理解（最多3个）
-      4. 直接以博客标题开始，不要添加任何前缀
-      5. 公式请渲染成Latex格式
-      
-      我将给你一篇论文的详细内容，请为以下论文生成一篇博客文章。
-      
-      请确保博客内容：
-      - 结构清晰，逻辑连贯，尽量详细一些，不要过于简略
-      - 在博客前几部分突出论文的核心贡献，符合新闻学博人眼球的风格
-      - 重点介绍文章的比较重要的方法，并且引用pipeline图，并且给出pipeline图的解释
-      - 适合研究人员阅读，但不要晦涩难懂，在必要的地方可以适当解释复杂的名词概念
+        prompt = format_blog_prompt(
+            data_path=self.data_path,
+            arxiv_id=arxiv_id,
+            text_chunks=str(paper.text_chunks),
+            table_chunks=str(paper.table_chunks),
+            figure_chunks=str(paper.figure_chunks),
+            title=paper.title,
+            input_format=input_format
+        )
 
-      请使用小标题。你最好可以根据文章实际内容确定一些针对本篇文章特有的小标题。不要设置层次过多的小标题。
-      最好可以在开头有吸引人的小标题
-      最好小标题具有强大的概括能力，显得很精辟
-      如果你实在没有灵感的话，你可以参考的小标题：
-      - 概述介绍
-      - 理论框架和定义
-      - 核心方法
-      - 实验设计
-      - 应用场景及评估
-      - 未来发展方向和开放性挑战
-      - 相关引文
-      - 相关链接
-
-      注意事项：
-      如果论文包含图表，请选择重要的图表（尤其是表示pipeline的图）进行引用。
-      对于每个图表，使用以下格式：
-      ![Figure X: short caption]({self.data_path}/{arxiv_id}_FigureX.png)
-
-      （注意，不要写FigureX，而是原文中真实的Figure号码）
-      论文的额外信息（如官方网站、代码、数据集等）可以使用超链接。
-
-      下面是论文原文：
-      {paper.text_chunks}
-      下面是文中用到的图表，你的图表来源必须来自以下这些：
-      {paper.table_chunks},
-      {paper.figure_chunks}
-        """
+        print(prompt)
         import time
 
         max_retries = 5
         for attempt in range(1, max_retries + 1):
             try:
-                response = self.client.models.generate_content(
-                    model=self.model_name,
-                    contents=[
-                        prompt,
-                        ''' types.Part.from_bytes(
+                # Build contents list based on input_format
+                contents = [prompt]
+                if input_format == "pdf":
+                    contents.append(
+                        types.Part.from_bytes(
                             data=pdf_data,
                             mime_type='application/pdf',
-                        ),'''
-                    ]
+                        )
+                    )
+                
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=contents
                 )
                 break  # 成功就跳出循环
             except Exception as e:
@@ -247,13 +265,6 @@ class GeminiBlogGenerator_recommend(BaseGenerator):
                 else:
                     print("已达到最大重试次数，终止。")
                     return
-
-        """
-        types.Part.from_bytes(
-                    data=pdf_data,
-                    mime_type='application/pdf',
-                ),
-        """
 
         markdown_path = os.path.join(self.output_path, f"{arxiv_id}.md")
         os.makedirs(os.path.dirname(markdown_path), exist_ok=True)  # 确保目录存在

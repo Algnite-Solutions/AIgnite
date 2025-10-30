@@ -20,7 +20,7 @@ from abc import ABC, abstractmethod
 
 class BaseHTMLExtractor(ABC):
     """Abstract base classes of the HTML extractor"""
-    def __init__(self, html_text_folder, pdf_folder_path, arxiv_pool, image_folder_path, json_path, volcengine_ak, volcengine_sk, start_time, end_time):
+    def __init__(self, html_text_folder, pdf_folder_path, arxiv_pool, image_folder_path, json_path, volcengine_ak, volcengine_sk, start_time, end_time, max_results):
         '''
         Args:
         html_text_folder: the folder path used to store the .html file.
@@ -44,6 +44,7 @@ class BaseHTMLExtractor(ABC):
         self.end_time = end_time
         #Helper
         self.pdf_parser_helper = ArxivPDFExtractor(self.docs, pdf_folder_path, image_folder_path, arxiv_pool, json_path, volcengine_ak, volcengine_sk, start_time, end_time)
+        self.max_results = max_results
 
     @abstractmethod
     def extract_all_htmls(self) -> DocSet:
@@ -92,7 +93,7 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
 
         search = arxiv.Search(
             query=query,
-            max_results=None,  # You can set max papers you want here
+            max_results=self.max_results,  # You can set max papers you want here
             sort_by=arxiv.SortCriterion.SubmittedDate
         )
 
