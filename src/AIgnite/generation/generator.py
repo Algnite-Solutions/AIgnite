@@ -91,7 +91,7 @@ class GeminiBlogGenerator_default(BaseGenerator):
     TODO: @Qi, replace data_path and output_path with the actual DB_query and DB_write functions.
     """
     def __init__(self, model_name="gemini-2.5-flash-lite-preview-09-2025", data_path="./output", output_path="./experiments/output", input_format="pdf"):
-        api_key = os.getenv("GEMINI_API_KEY")
+        api_key = "AIzaSyDbZun4zIIwgCWpmccj_wAczR4fXHVIZ0M"
         if not api_key:
             raise ValueError("GEMINI_API_KEY environment variable is not set")
         self.client = genai.Client(api_key=api_key)
@@ -180,7 +180,7 @@ class GeminiBlogGenerator_recommend(BaseGenerator):
     TODO: @Qi, replace data_path and output_path with the actual DB_query and DB_write functions.
     """
     def __init__(self, model_name="gemini-2.5-flash-preview-09-2025", data_path="./output", output_path="./experiments/output", input_format="pdf"):
-        api_key = os.getenv("GEMINI_API_KEY")
+        api_key = "AIzaSyDbZun4zIIwgCWpmccj_wAczR4fXHVIZ0M"
         if not api_key:
             raise ValueError("GEMINI_API_KEY environment variable is not set")
         self.client = genai.Client(api_key=api_key)

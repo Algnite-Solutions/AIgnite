@@ -103,9 +103,9 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
         tem = client.results(search)
         tem = list(tem)
         print("successful search!")
-
+        
         for result in tem:
-            html_url = result.pdf_url.replace("pdf", "html")
+            html_url = result.entry_id.replace("abs", "html")
             arxiv_id = html_url.split('/')[-1]
             with open(self.arxiv_pool, "r", encoding="utf-8") as f:
                 if arxiv_id in f.read():
