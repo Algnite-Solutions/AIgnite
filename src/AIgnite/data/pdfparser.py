@@ -2,6 +2,9 @@ from bs4 import BeautifulSoup
 from .docset import DocSet, TextChunk, FigureChunk, TableChunk, ChunkType
 from pathlib import Path
 #new
+import fitz  # PyMuPDF
+import os
+import io
 from datetime import datetime, timezone, timedelta
 import arxiv
 import os
@@ -313,59 +316,241 @@ class ArxivPDFExtractor(BasePDFExtractor):
                 f.write(json_str)
 
 ############################################################### Some Tools ####################################################################
-    
 def compress_pdf(input_path: str, output_path: str = None, max_size_mb: float = 7.5) -> str:
     """
-    压缩PDF文件，如果文件大小超过指定值
+    压缩 PDF 文件，使输出文件大小小于指定的最大 MB。
+    若图片重编码与不同质量尝试仍未达到目标，会从最后一页开始逐页裁剪直到符合或裁完。
     
-    Args:
-        input_path: 输入PDF文件路径
-        output_path: 输出PDF文件路径，如果为None则覆盖原文件
-        max_size_mb: 最大文件大小（MB）
+    参数：
+        input_path (str): 输入 PDF 路径
+        output_path (str): 输出 PDF 路径（如果为 None 则覆盖原文件）
+        max_size_mb (float): 最大文件大小（MB）
     
-    Returns:
-        str: 压缩后的文件路径，如果压缩失败则返回原文件路径
+    返回：
+        str: 压缩后文件路径（如果覆盖原文件，返回原文件路径）
     """
+    # 决定写入路径：如果 output_path 为 None，则写入临时文件，最后替换原文件
+    overwrite_original = output_path is None
+    if overwrite_original:
+        tmp_output = f"{input_path}.compress_tmp"
+        write_path = tmp_output
+        final_output_path = input_path
+    else:
+        write_path = output_path
+        final_output_path = output_path
+
     if output_path is None:
-        output_path = input_path
-    
-    # 检查文件大小
-    file_size_mb = os.path.getsize(input_path) / (1024 * 1024)
-    if file_size_mb <= max_size_mb:
-        print(f"📄 PDF 文件大小 ({file_size_mb:.2f}MB) 未超过 {max_size_mb}MB，无需压缩")
-        return input_path
-    
-    print(f"📦 PDF 文件大小 ({file_size_mb:.2f}MB) 超过 {max_size_mb}MB，开始压缩...")
-    
+        # 保持兼容：不直接覆盖原文件，使用临时文件最后原子替换
+        pass
+    else:
+        # 如果传入的是目录，则在该目录下构造文件名
+        if os.path.isdir(output_path):
+            base = os.path.splitext(os.path.basename(input_path))[0]
+            write_path = os.path.join(output_path, f"{base}_compressed.pdf")
+            final_output_path = write_path
+
+    # 输入文件大小（MB）
     try:
-        # 创建PdfCompressor对象并传入PDF文件
-        compressor = PdfCompressor(input_path)
+        original_size = os.path.getsize(input_path)
+    except Exception:
+        original_size = None
 
-        # 获取OptimizationOptions对象
-        options = compressor.OptimizationOptions
+    if original_size is not None:
+        print(f"输入: {input_path} -> {original_size / 1024 / 1024:.2f} MB")
+    else:
+        print(f"输入: {input_path} -> 无法获取大小")
 
-        # 压缩字体
-        options.SetIsCompressFonts(True)
-        # 取消字体嵌入
-        # options.SetIsUnembedFonts(True)
+    max_bytes = max_size_mb * 1024 * 1024
+    quality = 90
+    step = 10
 
-        # 设置图片质量
-        options.SetImageQuality(ImageQuality.Medium)
-        # 调整图片大小
-        options.SetResizeImages(True)
-        # 压缩图片
-        options.SetIsCompressImage(True)
+    # 尝试导入 Pillow，用于图片重编码
+    try:
+        from PIL import Image
+        pillow_available = True
+        print("Pillow: 可用，启用图片重编码")
+    except Exception:
+        pillow_available = False
+        print("Pillow: 不可用，仅使用 PyMuPDF 保存参数")
 
-        # 压缩PDF文件并保存
-        compressor.CompressToFile(output_path)
-        new_size_mb = os.path.getsize(output_path) / (1024 * 1024)
-        compression_ratio = (1 - new_size_mb/file_size_mb) * 100
-        
-        print(f"✅ PDF压缩完成: {file_size_mb:.2f}MB -> {new_size_mb:.2f}MB (压缩率: {compression_ratio:.1f}%)")
-        return output_path
-    except Exception as e:
-        print(f"⚠️ PDF压缩失败: {str(e)}")
-        return input_path
+    out_buf = None
+    size = None
+
+    # 每次从原文件重新打开，避免重复压缩同一图像
+    try:
+        while quality >= 10:
+            doc = fitz.open(input_path)
+            # 若安装了 Pillow，则对文档中所有图片以当前质量重编码
+            if pillow_available:
+                for page_index in range(len(doc)):
+                    page = doc[page_index]
+                    images = page.get_images(full=True)
+                    if not images:
+                        continue
+                    for img_info in images:
+                        xref = img_info[0]
+                        try:
+                            img_dict = doc.extract_image(xref)
+                            img_bytes = img_dict.get("image")
+                            if not img_bytes:
+                                continue
+                            img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+                            buf = io.BytesIO()
+                            img.save(buf, format="JPEG", quality=quality)
+                            new_bytes = buf.getvalue()
+                            # 用重编码后的字节替换原图
+                            doc.update_image(xref, stream=new_bytes)
+                        except Exception:
+                            # 遇到任何图片处理问题，跳过该图片
+                            continue
+
+            # 使用仅受支持的参数保存到内存并检查大小
+            out_buf = io.BytesIO()
+            doc.save(out_buf, garbage=4, deflate=True, clean=True, incremental=False)
+            size = len(out_buf.getvalue())
+            doc.close()
+
+            print(f"尝试: 质量={quality} -> {size / 1024 / 1024:.2f} MB")
+
+            if size <= max_bytes:
+                # 写入临时或目标文件
+                with open(write_path, "wb") as f:
+                    f.write(out_buf.getvalue())
+                # 如果需要覆盖原文件，原子替换
+                if overwrite_original:
+                    try:
+                        os.replace(write_path, final_output_path)
+                    except Exception as e:
+                        # 若替换失败，保留临时文件并抛出
+                        print(f"⚠️ 无法替换原文件: {e}，临时文件保留在 {write_path}")
+                        raise
+                if original_size is not None:
+                    print(f"✅ 压缩完成: {final_output_path} ({original_size / 1024 / 1024:.2f} MB -> {size / 1024 / 1024:.2f} MB, 质量={quality})")
+                else:
+                    print(f"✅ 压缩完成: {final_output_path} ({size / 1024 / 1024:.2f} MB, 质量={quality})")
+                return final_output_path
+
+            quality -= step
+
+        # 若到这里仍未达标，尝试裁剪最后几页（从最后一页开始裁），每次少一页直到符合或裁完
+        print("开始裁剪页面（从最后一页开始逐页裁剪）以尝试达标...")
+        try:
+            orig_doc = fitz.open(input_path)
+        except Exception as e:
+            print(f"无法打开原文件进行裁剪: {e}")
+            # 若无法打开原文件，直接保存上次生成的 out_buf（若有）到写入路径
+            if out_buf is not None:
+                with open(write_path, "wb") as f:
+                    f.write(out_buf.getvalue())
+                if overwrite_original:
+                    try:
+                        os.replace(write_path, final_output_path)
+                    except Exception:
+                        pass
+            raise
+
+        total_pages = len(orig_doc)
+        # 如果文件本来就只有1页且未达标，直接保存当前 out_buf（如果存在）
+        if total_pages <= 1:
+            print("PDF 只有 1 页，无法裁剪更多页。")
+            if out_buf is not None:
+                with open(write_path, "wb") as f:
+                    f.write(out_buf.getvalue())
+                if overwrite_original:
+                    try:
+                        os.replace(write_path, final_output_path)
+                    except Exception:
+                        pass
+            orig_doc.close()
+            if original_size is not None:
+                print(f"⚠️ 无法完全压缩到 {max_size_mb} MB 以下，已尽可能压缩 ({original_size / 1024 / 1024:.2f} MB -> {size / 1024 / 1024:.2f} MB)")
+            else:
+                print(f"⚠️ 无法完全压缩到 {max_size_mb} MB 以下，已尽可能压缩 ({size / 1024 / 1024:.2f} MB)")
+            return final_output_path
+
+        # 裁剪循环：保留页数从 total_pages-1 到 1
+        success = False
+        for keep in range(total_pages - 1, 0, -1):
+            new_doc = fitz.open()  # 空文档
+            try:
+                new_doc.insert_pdf(orig_doc, from_page=0, to_page=keep - 1)
+                # 对新文档进行图片重编码（如果 Pillow 可用），使用较低质量以更易达标
+                if pillow_available:
+                    trim_quality = max(10, quality) if quality >= 10 else 30
+                    for page_index in range(len(new_doc)):
+                        page = new_doc[page_index]
+                        images = page.get_images(full=True)
+                        if not images:
+                            continue
+                        for img_info in images:
+                            xref = img_info[0]
+                            try:
+                                img_dict = new_doc.extract_image(xref)
+                                img_bytes = img_dict.get("image")
+                                if not img_bytes:
+                                    continue
+                                img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+                                buf = io.BytesIO()
+                                img.save(buf, format="JPEG", quality=trim_quality)
+                                new_bytes = buf.getvalue()
+                                new_doc.update_image(xref, stream=new_bytes)
+                            except Exception:
+                                continue
+
+                buf = io.BytesIO()
+                new_doc.save(buf, garbage=4, deflate=True, clean=True, incremental=False)
+                this_size = len(buf.getvalue())
+                print(f"裁剪: 保留 {keep} 页 -> {this_size / 1024 / 1024:.2f} MB")
+
+                if this_size <= max_bytes:
+                    with open(write_path, "wb") as f:
+                        f.write(buf.getvalue())
+                    if overwrite_original:
+                        try:
+                            os.replace(write_path, final_output_path)
+                        except Exception as e:
+                            print(f"⚠️ 无法替换原文件: {e}，临时文件保留在 {write_path}")
+                            raise
+                    if original_size is not None:
+                        print(f"✅ 裁剪并压缩完成: {final_output_path} ({original_size / 1024 / 1024:.2f} MB -> {this_size / 1024 / 1024:.2f} MB, 保留 {keep} 页)")
+                    else:
+                        print(f"✅ 裁剪并压缩完成: {final_output_path} ({this_size / 1024 / 1024:.2f} MB, 保留 {keep} 页)")
+                    success = True
+                    new_doc.close()
+                    break
+            finally:
+                try:
+                    new_doc.close()
+                except Exception:
+                    pass
+
+        orig_doc.close()
+
+        if not success:
+            # 无法通过裁剪达到目标，保存最后一次尝试的结果（尽可能压缩）
+            if out_buf is not None:
+                with open(write_path, "wb") as f:
+                    f.write(out_buf.getvalue())
+                if overwrite_original:
+                    try:
+                        os.replace(write_path, final_output_path)
+                    except Exception:
+                        pass
+            if original_size is not None and size is not None:
+                print(f"⚠️ 裁剪后仍无法完全压缩到 {max_size_mb} MB 以下，已尽可能压缩 ({original_size / 1024 / 1024:.2f} MB -> {size / 1024 / 1024:.2f} MB)")
+            elif size is not None:
+                print(f"⚠️ 裁剪后仍无法完全压缩到 {max_size_mb} MB 以下，已尽可能压缩 ({size / 1024 / 1024:.2f} MB)")
+        return final_output_path
+    finally:
+        # 清理可能残留的临时文件（仅当写入临时覆盖原文件且最终文件已被替换时）
+        if overwrite_original:
+            tmp = f"{input_path}.compress_tmp"
+            if os.path.exists(tmp):
+                # 如果原子替换已经发生，临时文件可能已被移动；仅在还存在时尝试删除
+                try:
+                    os.remove(tmp)
+                except Exception:
+                    pass
 
 def verify_pdf(file_path: str) -> bool:
     """
@@ -496,7 +681,7 @@ def download_paper(result, save_path: str, filename: str) -> bool:
     # 第二步：使用可靠下载方法
     print(f"使用可靠下载方法下载: {filename}")
     return download_pdf_with_retry(
-        url=result.pdf_url,
+        url=result.entry_id.replace("abs", "pdf"),
         save_path=save_path,
         filename=filename
     )
@@ -542,13 +727,27 @@ def get_pdf_md(path,store_path,name,ak,sk):
         print(f"📦 PDF 超过 7.5MB，需要压缩。")
         try:
             compressed_path = compress_pdf(path)
-            print(f"✅ PDF压缩完成，使用压缩后的文件")
-            path = compressed_path
+            # compress_pdf在失败时会返回原文件路径，检查是否真的压缩了
+            original_size = os.path.getsize(path)
+            compressed_size = os.path.getsize(compressed_path) if os.path.exists(compressed_path) else original_size
+            
+            if compressed_size < original_size:
+                print(f"✅ PDF压缩完成，使用压缩后的文件 ({compressed_size/(1024*1024):.2f}MB)")
+                path = compressed_path
+            else:
+                print(f"⚠️ PDF压缩未生效，使用原文件 ({original_size/(1024*1024):.2f}MB)")
+            
             with open(str(path), 'rb') as f:
                 pdf_content = f.read()
         except Exception as e:
-            print(f"⚠️ 压缩失败：{e}")
-            return None
+            print(f"⚠️ 压缩过程出错：{e}，尝试使用原文件")
+            # 即使压缩失败，也尝试使用原文件继续处理
+            try:
+                with open(str(path), 'rb') as f:
+                    pdf_content = f.read()
+            except Exception as e2:
+                print(f"❌ 无法读取PDF文件：{e2}")
+                return None
     
     form = {
         "image_base64": base64.b64encode(pdf_content).decode(),   # 文件binary 图片/PDF 
