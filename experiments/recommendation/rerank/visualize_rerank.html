@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rerank Results Visualization</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .query-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .query-label {
+            font-size: 0.9em;
+            color: #667eea;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .query-text {
+            font-size: 1.1em;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .thought-card {
+            background: #fff9e6;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border-left: 4px solid #ffa726;
+        }
+
+        .thought-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+
+        .thought-header:hover {
+            opacity: 0.8;
+        }
+
+        .thought-label {
+            font-size: 0.9em;
+            color: #f57c00;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .thought-toggle {
+            font-size: 1.5em;
+            color: #f57c00;
+            transition: transform 0.3s;
+        }
+
+        .thought-toggle.expanded {
+            transform: rotate(180deg);
+        }
+
+        .thought-content {
+            font-size: 0.95em;
+            line-height: 1.7;
+            color: #555;
+            white-space: pre-wrap;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .thought-content.expanded {
+            max-height: 2000px;
+        }
+
+        .comparison-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .results-panel {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 3px solid #f0f0f0;
+        }
+
+        .panel-icon {
+            font-size: 2em;
+            margin-right: 10px;
+        }
+
+        .panel-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .original .panel-header {
+            border-bottom-color: #ffa726;
+        }
+
+        .reranked .panel-header {
+            border-bottom-color: #66bb6a;
+        }
+
+        .document-item {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 12px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+            border-left: 4px solid transparent;
+        }
+
+        .document-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .document-rank {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 28px;
+            font-weight: bold;
+            font-size: 0.9em;
+            margin-right: 10px;
+        }
+
+        .document-id {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        .paper-title {
+            font-weight: bold;
+            color: #333;
+            font-size: 1em;
+            margin-top: 10px;
+            margin-bottom: 5px;
+        }
+
+        .paper-abstract {
+            font-size: 0.85em;
+            color: #666;
+            line-height: 1.5;
+            margin-top: 5px;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .paper-abstract.expanded {
+            -webkit-line-clamp: unset;
+            display: block;
+        }
+
+        .expand-btn {
+            color: #667eea;
+            cursor: pointer;
+            font-size: 0.85em;
+            margin-top: 5px;
+            display: inline-block;
+            font-weight: 500;
+        }
+
+        .expand-btn:hover {
+            text-decoration: underline;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: bold;
+            margin-left: 10px;
+            text-transform: uppercase;
+        }
+
+        .badge-kept {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .badge-new {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .badge-removed {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        .kept {
+            border-left-color: #42a5f5;
+            background: #e3f2fd;
+        }
+
+        .new {
+            border-left-color: #66bb6a;
+            background: #e8f5e9;
+        }
+
+        .removed {
+            border-left-color: #ef5350;
+            background: #ffebee;
+            opacity: 0.7;
+        }
+
+        .stats-container {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            color: white;
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .navigation {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .nav-button {
+            background: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .nav-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 7px 20px rgba(0,0,0,0.3);
+        }
+
+        .nav-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .query-counter {
+            background: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            color: #667eea;
+            display: inline-block;
+        }
+
+        @media (max-width: 768px) {
+            .comparison-container {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .loading {
+            text-align: center;
+            color: white;
+            font-size: 1.5em;
+            margin-top: 50px;
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #c62828;
+        }
+
+        .upload-container {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            padding: 40px;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .upload-area:hover {
+            background: #e9ecef;
+            border-color: #764ba2;
+        }
+
+        .upload-icon {
+            font-size: 4em;
+            margin-bottom: 15px;
+        }
+
+        .upload-text {
+            font-size: 1.2em;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .upload-hint {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        #fileInput {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎯 Reranking Results Visualization</h1>
+            <p class="subtitle">Compare original retrieval vs. reranked recommendations</p>
+        </header>
+
+        <div id="app">
+            <div class="upload-container">
+                <h2 style="color: #667eea; margin-bottom: 30px;">Upload Files</h2>
+
+                <div class="upload-area" onclick="document.getElementById('resultsInput').click()" style="margin-bottom: 20px;">
+                    <div class="upload-icon">📊</div>
+                    <div class="upload-text">1. Click to select rerank_results.jsonl</div>
+                    <div class="upload-hint" id="resultsStatus">Required</div>
+                </div>
+                <input type="file" id="resultsInput" accept=".jsonl" onchange="handleResultsUpload(event)" style="display: none;">
+
+                <div class="upload-area" onclick="document.getElementById('metadataInput').click()">
+                    <div class="upload-icon">📄</div>
+                    <div class="upload-text">2. Click to select arxiv_metadata.tsv</div>
+                    <div class="upload-hint" id="metadataStatus">Optional (for titles/abstracts)</div>
+                </div>
+                <input type="file" id="metadataInput" accept=".tsv" onchange="handleMetadataUpload(event)" style="display: none;">
+
+                <div id="viewButtonContainer" style="margin-top: 30px; display: none;">
+                    <button class="nav-button" onclick="renderQuery(0)" style="font-size: 1.1em; padding: 15px 40px;">
+                        View Results →
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allData = [];
+        let metadataDict = {};
+        let currentIndex = 0;
+        let resultsLoaded = false;
+        let metadataLoaded = false;
+
+        // Handle results file upload
+        function handleResultsUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const text = e.target.result;
+                    parseResultsData(text);
+                    document.getElementById('resultsStatus').textContent = '✓ Loaded';
+                    document.getElementById('resultsStatus').style.color = '#388e3c';
+                    resultsLoaded = true;
+
+                    // Show the view button
+                    document.getElementById('viewButtonContainer').style.display = 'block';
+                } catch (error) {
+                    showError(error.message);
+                }
+            };
+            reader.onerror = function() {
+                showError('Failed to read results file');
+            };
+            reader.readAsText(file);
+        }
+
+        // Handle metadata file upload
+        function handleMetadataUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const text = e.target.result;
+                    parseMetadataData(text);
+                    document.getElementById('metadataStatus').textContent = '✓ Loaded';
+                    document.getElementById('metadataStatus').style.color = '#388e3c';
+                    metadataLoaded = true;
+
+                    // Just show confirmation, don't auto-render
+                } catch (error) {
+                    showError('Failed to parse metadata: ' + error.message);
+                }
+            };
+            reader.onerror = function() {
+                showError('Failed to read metadata file');
+            };
+            reader.readAsText(file);
+        }
+
+        function parseResultsData(text) {
+            // Parse JSONL (one JSON object per line)
+            allData = text.trim().split('\n')
+                .filter(line => line.trim())
+                .map(line => JSON.parse(line));
+
+            if (allData.length === 0) {
+                throw new Error('No data found in results file');
+            }
+        }
+
+        function parseMetadataData(text) {
+            // Parse TSV file: paper_id\ttitle . abstract
+            const lines = text.trim().split('\n');
+            metadataDict = {};
+
+            for (const line of lines) {
+                const tabIndex = line.indexOf('\t');
+                if (tabIndex === -1) continue;
+
+                const paperId = line.substring(0, tabIndex);
+                const content = line.substring(tabIndex + 1);
+
+                // Split by ' . ' to separate title and abstract
+                const dotIndex = content.indexOf(' . ');
+                if (dotIndex !== -1) {
+                    const title = content.substring(0, dotIndex).trim();
+                    const abstract = content.substring(dotIndex + 3).trim();
+                    metadataDict[paperId] = { title, abstract };
+                } else {
+                    // If no ' . ' found, treat entire content as title
+                    metadataDict[paperId] = { title: content.trim(), abstract: '' };
+                }
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('app').innerHTML = `
+                <div class="upload-container">
+                    <div class="error">
+                        <strong>Error:</strong> ${message}
+                    </div>
+                    <br>
+                    <button class="nav-button" onclick="location.reload()">Try Again</button>
+                </div>
+            `;
+        }
+
+        function renderQuery(index) {
+            currentIndex = index;
+            const data = allData[index];
+
+            // Calculate statistics
+            const originalSet = new Set(data.original_top_k_ids);
+            const rerankedSet = new Set(data.reranked_ids);
+            const kept = data.reranked_ids.filter(id => originalSet.has(id));
+            const added = data.reranked_ids.filter(id => !originalSet.has(id));
+            const removed = data.original_top_k_ids.filter(id => !rerankedSet.has(id));
+
+            const html = `
+                <div class="navigation">
+                    <button class="nav-button" onclick="renderQuery(${index - 1})" ${index === 0 ? 'disabled' : ''}>
+                        ← Previous
+                    </button>
+                    <div class="query-counter">
+                        Query ${index + 1} of ${allData.length}
+                    </div>
+                    <button class="nav-button" onclick="renderQuery(${index + 1})" ${index === allData.length - 1 ? 'disabled' : ''}>
+                        Next →
+                    </button>
+                </div>
+
+                <div class="query-card">
+                    <div class="query-label">Research Query</div>
+                    <div class="query-text">${escapeHtml(data.query)}</div>
+                </div>
+
+                ${data.thought_summary ? `
+                <div class="thought-card">
+                    <div class="thought-header" onclick="toggleThought()">
+                        <div class="thought-label">
+                            <span>💭</span>
+                            <span>AI Thinking Process</span>
+                        </div>
+                        <div class="thought-toggle" id="thoughtToggle">▼</div>
+                    </div>
+                    <div class="thought-content" id="thoughtContent">
+${escapeHtml(data.thought_summary)}
+                    </div>
+                </div>
+                ` : ''}
+
+                <div class="stats-container">
+                    <div class="stats-grid">
+                        <div class="stat-box" style="background: linear-gradient(135deg, #42a5f5 0%, #1976d2 100%);">
+                            <div class="stat-number">${kept.length}</div>
+                            <div class="stat-label">Kept</div>
+                        </div>
+                        <div class="stat-box" style="background: linear-gradient(135deg, #66bb6a 0%, #388e3c 100%);">
+                            <div class="stat-number">${added.length}</div>
+                            <div class="stat-label">Added</div>
+                        </div>
+                        <div class="stat-box" style="background: linear-gradient(135deg, #ef5350 0%, #c62828 100%);">
+                            <div class="stat-number">${removed.length}</div>
+                            <div class="stat-label">Removed</div>
+                        </div>
+                        <div class="stat-box" style="background: linear-gradient(135deg, #ffa726 0%, #f57c00 100%);">
+                            <div class="stat-number">${((kept.length / data.original_top_k_ids.length) * 100).toFixed(0)}%</div>
+                            <div class="stat-label">Retention</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="comparison-container">
+                    <div class="results-panel original">
+                        <div class="panel-header">
+                            <div class="panel-icon">📋</div>
+                            <div class="panel-title">Original Top-5</div>
+                        </div>
+                        ${data.original_top_k_ids.map((id, idx) => {
+                            const status = rerankedSet.has(id) ? 'kept' : 'removed';
+                            const badge = rerankedSet.has(id)
+                                ? '<span class="status-badge badge-kept">✓ Kept</span>'
+                                : '<span class="status-badge badge-removed">✗ Removed</span>';
+                            const metadata = metadataDict[id];
+                            const paperContent = metadata ? `
+                                <div class="paper-title">${escapeHtml(metadata.title)}</div>
+                                <div class="paper-abstract" id="abstract-orig-${idx}">${escapeHtml(metadata.abstract)}</div>
+                                ${metadata.abstract.length > 300 ? `<span class="expand-btn" onclick="toggleAbstract('abstract-orig-${idx}')">Show more</span>` : ''}
+                            ` : '';
+                            return `
+                                <div class="document-item ${status}">
+                                    <div>
+                                        <span class="document-rank">${idx + 1}</span>
+                                        <span class="document-id">${escapeHtml(id)}</span>
+                                        ${badge}
+                                    </div>
+                                    ${paperContent}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+
+                    <div class="results-panel reranked">
+                        <div class="panel-header">
+                            <div class="panel-icon">🎯</div>
+                            <div class="panel-title">Reranked Top-5</div>
+                        </div>
+                        ${data.reranked_ids.map((id, idx) => {
+                            const status = originalSet.has(id) ? 'kept' : 'new';
+                            const badge = originalSet.has(id)
+                                ? '<span class="status-badge badge-kept">✓ Kept</span>'
+                                : '<span class="status-badge badge-new">⭐ New</span>';
+                            const metadata = metadataDict[id];
+                            const paperContent = metadata ? `
+                                <div class="paper-title">${escapeHtml(metadata.title)}</div>
+                                <div class="paper-abstract" id="abstract-rerank-${idx}">${escapeHtml(metadata.abstract)}</div>
+                                ${metadata.abstract.length > 300 ? `<span class="expand-btn" onclick="toggleAbstract('abstract-rerank-${idx}')">Show more</span>` : ''}
+                            ` : '';
+                            return `
+                                <div class="document-item ${status}">
+                                    <div>
+                                        <span class="document-rank">${idx + 1}</span>
+                                        <span class="document-id">${escapeHtml(id)}</span>
+                                        ${badge}
+                                    </div>
+                                    ${paperContent}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('app').innerHTML = html;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function toggleAbstract(elementId) {
+            const element = document.getElementById(elementId);
+            const button = element.nextElementSibling;
+
+            if (element.classList.contains('expanded')) {
+                element.classList.remove('expanded');
+                button.textContent = 'Show more';
+            } else {
+                element.classList.add('expanded');
+                button.textContent = 'Show less';
+            }
+        }
+
+        function toggleThought() {
+            const content = document.getElementById('thoughtContent');
+            const toggle = document.getElementById('thoughtToggle');
+
+            if (content.classList.contains('expanded')) {
+                content.classList.remove('expanded');
+                toggle.classList.remove('expanded');
+            } else {
+                content.classList.add('expanded');
+                toggle.classList.add('expanded');
+            }
+        }
+    </script>
+</body>
+</html>
