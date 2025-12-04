@@ -1,0 +1,91 @@
+blog_rerank_prompt: |
+  # Academic Document Retrieval System
+
+  ## Task Objective
+  Your task is to analyze a collection of academic papers and identify the 5 most relevant documents that would best help answer a given research question.
+
+  ## Input Data
+  <documents>
+  {documents_text}
+  </documents>
+
+  <query>
+  {query}
+  </query>
+
+  ## Detailed Instructions
+  1. Carefully read and understand the research question in the <query> section.
+  2. Analyze each academic document in the collection, paying attention to:
+    - Relevance of the document's main topic to the query
+    - Presence of specific information that directly addresses the question
+    - Quality and depth of information related to the query
+    - Recency and authority of the research (if applicable)
+  3. Rank the documents based on their relevance to the query.
+  4. Select the top 5 most relevant documents.
+
+  ## Selection Criteria
+  - Prioritize documents that directly address the specific aspects mentioned in the query
+  - Consider documents with experimental evidence or empirical data related to the query
+  - Include documents that provide comprehensive background information if relevant
+  - Select documents that complement each other to provide a well-rounded answer
+
+  ## Response Format
+  Return ONLY the document IDs of the 5 most relevant documents, with one document ID per line, enclosed in <Documents></Documents> tags. Do not include any explanations, justifications, or additional text.
+
+  Example response format:
+  <Documents>
+  doc_id_1
+  doc_id_2
+  doc_id_3
+  doc_id_4
+  doc_id_5
+  </Documents>
+
+  Provide your final list of the 5 most relevant document IDs without any preamble or additional explanations.
+
+
+blog_rerank_pdf_prompt: |
+  # Academic Document Retrieval System (Interest Alignment Mode)
+
+  ## Task Objective
+  Act as a **Research Scout** for a senior researcher. Your goal is to curate a reading list of 5 documents that best satisfy the user's stated **Research Interests**. You are looking for high-value signal, not just keyword matches.
+
+  ## Input Data
+  <documents>
+  {documents_text}
+  </documents>
+
+  <interest_profile>
+  {user_interest_description}
+  </interest_profile>
+
+  ## Detailed Instructions
+  1.  **Analyze the Interest Profile:**
+      * Identify the core topics (e.g., "Long-text input," "Benchmarks," "Evaluation").
+      * Identify the target utility (e.g., "Assessing capabilities," "Handling lengthy documents").
+      * *Crucial:* Understand that the user is looking for *tools, methods, and evidence*, not just definitions.
+
+  2.  **Evaluate Each Document (The "Scout" Logic):**
+      * **Direct Alignment:** Does this paper present a benchmark, a dataset, or a rigorous evaluation method for the specific topics in the profile?
+      * **Methodological Depth:** Is the paper purely theoretical, or does it offer empirical results (tables, charts, comparisons) relevant to the interest?
+      * **Authority Signal:** Is this from a key player in this specific niche (e.g., DeepMind, Anthropic, Stanford CRFM) or a top-tier venue (NeurIPS, ICLR)?
+
+  3.  **Selection Strategy (The "3-Tier Mix"):**
+      * **Tier 1: The Core Matches (3 docs):** Papers that are explicitly about the intersection of the user's interests (e.g., "A new benchmark for 100k+ token context").
+      * **Tier 2: The High-Authority Broaden (1 doc):** A seminal paper from a famous lab that might be slightly broader but defines the field (e.g., a major survey on LLM evaluations).
+      * **Tier 3: The Novelty/Wildcard (1 doc):** A paper applying these concepts in a unique way (e.g., "Using long-context LLMs for legal contract analysis") to spark new ideas.
+
+  ## Ranking Logic
+  Rank the top 5 documents. The list must prioritize **utility** to the researcher. A paper describing a *new benchmark* is more valuable than a paper simply *using* an old one.
+
+  ## Response Format
+  Return ONLY the document IDs of the 5 most relevant documents, with one document ID per line, enclosed in <Documents></Documents> tags.
+
+  Example response format:
+  <Documents>
+  doc_id_1
+  doc_id_2
+  doc_id_3
+  doc_id_4
+  doc_id_5
+  </Documents>
