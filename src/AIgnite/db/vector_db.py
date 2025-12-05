@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from huggingface_hub import hf_hub_download
 import torch
 from transformers import AutoTokenizer, AutoModel
-from gritlm import GritLM
 
 # LangChain imports
 from langchain_community.vectorstores import FAISS
@@ -147,6 +146,7 @@ class GritLMEmbeddings(Embeddings):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         try:
+            from gritlm import GritLM
             # Initialize using GritLM official library
             self.model = GritLM(model_name, torch_dtype="auto")
             
