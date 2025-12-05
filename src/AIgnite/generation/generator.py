@@ -235,7 +235,6 @@ class GeminiBlogGenerator_recommend(BaseGenerator):
             input_format=input_format
         )
 
-        print(prompt)
         import time
 
         max_retries = 5

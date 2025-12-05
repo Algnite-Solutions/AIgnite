@@ -18,8 +18,6 @@ import re
 from typing import List, Tuple
 import base64
 from volcengine.visual.VisualService import VisualService
-from spire.pdf.common import *
-from spire.pdf import *
 from abc import ABC, abstractmethod
 
 class BasePDFExtractor(ABC):
