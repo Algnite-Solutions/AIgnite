@@ -1,0 +1,1449 @@
+{
+  "user": "Fang Guo",
+  "profile_file": "results/profile_Fang_Guo.json",
+  "prompt_used": "personalized_ranking_prompt",
+  "month": "2026-01",
+  "summary": {
+    "days_analyzed": 29,
+    "avg_original_f1": 0.042692939244663386,
+    "avg_reranked_f1": 0.02298850574712644,
+    "f1_change": -0.019704433497536946,
+    "total_added": 94,
+    "total_removed": 94
+  },
+  "per_day_results": [
+    {
+      "day": "2026-01-01",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 13,
+      "original_top_k": [
+        "2512.22738v1",
+        "2512.22899v1",
+        "2512.22795v1",
+        "2512.22524v1",
+        "2512.22629v1"
+      ],
+      "reranked_top_5": [
+        "2512.22629v1",
+        "2512.22933v1",
+        "2512.22627v1",
+        "2512.22899v1",
+        "2512.22838v1"
+      ],
+      "added": [
+        "2512.22627v1",
+        "2512.22838v1",
+        "2512.22933v1"
+      ],
+      "removed": [
+        "2512.22795v1",
+        "2512.22738v1",
+        "2512.22524v1"
+      ],
+      "common": [
+        "2512.22629v1",
+        "2512.22899v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-03",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2512.24008v1",
+        "2512.24268v1",
+        "2512.23959v1",
+        "2512.24259v1",
+        "2512.23836v1"
+      ],
+      "reranked_top_5": [
+        "2512.24008v1",
+        "2512.23959v1",
+        "2512.24189v1",
+        "2512.23647v1",
+        "2512.23836v1"
+      ],
+      "added": [
+        "2512.23647v1",
+        "2512.24189v1"
+      ],
+      "removed": [
+        "2512.24268v1",
+        "2512.24259v1"
+      ],
+      "common": [
+        "2512.24008v1",
+        "2512.23836v1",
+        "2512.23959v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-04",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2512.24733v1",
+        "2512.24181v1",
+        "2512.24373v1",
+        "2512.24459v1",
+        "2512.24867v1"
+      ],
+      "reranked_top_5": [
+        "2512.24189v1",
+        "2512.24867v1",
+        "2512.24903v1",
+        "2512.24957v1",
+        "2512.24181v1"
+      ],
+      "added": [
+        "2512.24189v1",
+        "2512.24903v1",
+        "2512.24957v1"
+      ],
+      "removed": [
+        "2512.24459v1",
+        "2512.24373v1",
+        "2512.24733v1"
+      ],
+      "common": [
+        "2512.24181v1",
+        "2512.24867v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-05",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 16,
+      "original_top_k": [
+        "2512.25052v1",
+        "2512.24826v1",
+        "2512.24571v1",
+        "2512.24863v1",
+        "2512.24903v1"
+      ],
+      "reranked_top_5": [
+        "2512.24601v1",
+        "2512.24613v1",
+        "2512.25052v1",
+        "2512.24903v1",
+        "2512.25070v1"
+      ],
+      "added": [
+        "2512.24613v1",
+        "2512.24601v1",
+        "2512.25070v1"
+      ],
+      "removed": [
+        "2512.24826v1",
+        "2512.24863v1",
+        "2512.24571v1"
+      ],
+      "common": [
+        "2512.25052v1",
+        "2512.24903v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-06",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 18,
+      "original_top_k": [
+        "2601.00567v1",
+        "2601.00536v1",
+        "2601.00575v1",
+        "2601.00543v1",
+        "2601.00691v1"
+      ],
+      "reranked_top_5": [
+        "2601.00536v1",
+        "2601.00567v1",
+        "2601.00575v1",
+        "2601.00497v1",
+        "2601.00482v1"
+      ],
+      "added": [
+        "2601.00497v1",
+        "2601.00482v1"
+      ],
+      "removed": [
+        "2601.00543v1",
+        "2601.00691v1"
+      ],
+      "common": [
+        "2601.00575v1",
+        "2601.00567v1",
+        "2601.00536v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-07",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 15,
+      "original_top_k": [
+        "2601.01015v1",
+        "2601.01126v1",
+        "2601.01094v1",
+        "2601.01195v1",
+        "2601.01024v1"
+      ],
+      "reranked_top_5": [
+        "2601.01118v1",
+        "2601.01126v1",
+        "2601.01195v1",
+        "2601.01015v1",
+        "2601.00555v1"
+      ],
+      "added": [
+        "2601.01118v1",
+        "2601.00555v1"
+      ],
+      "removed": [
+        "2601.01094v1",
+        "2601.01024v1"
+      ],
+      "common": [
+        "2601.01015v1",
+        "2601.01126v1",
+        "2601.01195v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-08",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 14,
+      "original_top_k": [
+        "2601.01513v1",
+        "2601.01015v1",
+        "2601.01363v1",
+        "2601.01195v1",
+        "2601.01024v1"
+      ],
+      "reranked_top_5": [
+        "2601.01576v1",
+        "2601.01118v1",
+        "2601.01126v1",
+        "2601.01195v1",
+        "2601.01015v1"
+      ],
+      "added": [
+        "2601.01576v1",
+        "2601.01126v1",
+        "2601.01118v1"
+      ],
+      "removed": [
+        "2601.01024v1",
+        "2601.01363v1",
+        "2601.01513v1"
+      ],
+      "common": [
+        "2601.01015v1",
+        "2601.01195v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-09",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.01751v1",
+        "2601.02285v2",
+        "2601.01769v1",
+        "2601.01609v1",
+        "2601.02065v1"
+      ],
+      "reranked_top_5": [
+        "2601.02023v1",
+        "2601.01678v1",
+        "2601.01831v1",
+        "2601.01609v1",
+        "2601.01751v1"
+      ],
+      "added": [
+        "2601.01831v1",
+        "2601.02023v1",
+        "2601.01678v1"
+      ],
+      "removed": [
+        "2601.02065v1",
+        "2601.01769v1",
+        "2601.02285v2"
+      ],
+      "common": [
+        "2601.01609v1",
+        "2601.01751v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-10",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.02304v1",
+        "2601.03014v1",
+        "2601.03025v1",
+        "2601.02708v1",
+        "2601.02345v1"
+      ],
+      "reranked_top_5": [
+        "2601.02023v1",
+        "2601.02598v1",
+        "2601.03137v1",
+        "2601.02993v2",
+        "2601.03014v1"
+      ],
+      "added": [
+        "2601.02023v1",
+        "2601.02598v1",
+        "2601.03137v1",
+        "2601.02993v2"
+      ],
+      "removed": [
+        "2601.03025v1",
+        "2601.02304v1",
+        "2601.02708v1",
+        "2601.02345v1"
+      ],
+      "common": [
+        "2601.03014v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-11",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.03618v1",
+        "2601.03436v1",
+        "2601.03513v1",
+        "2601.03670v1",
+        "2601.03496v1"
+      ],
+      "reranked_top_5": [
+        "2601.03436v1",
+        "2601.03540v1",
+        "2601.03513v1",
+        "2601.03417v1",
+        "2601.03746v1"
+      ],
+      "added": [
+        "2601.03540v1",
+        "2601.03417v1",
+        "2601.03746v1"
+      ],
+      "removed": [
+        "2601.03670v1",
+        "2601.03618v1",
+        "2601.03496v1"
+      ],
+      "common": [
+        "2601.03513v1",
+        "2601.03436v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-12",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.04531v1",
+        "2601.04618v1",
+        "2601.04524v1",
+        "2601.04646v1",
+        "2601.05099v1"
+      ],
+      "reranked_top_5": [
+        "2601.05099v1",
+        "2601.04878v1",
+        "2601.04853v1",
+        "2601.04455v1",
+        "2601.04859v1"
+      ],
+      "added": [
+        "2601.04878v1",
+        "2601.04853v1",
+        "2601.04455v1",
+        "2601.04859v1"
+      ],
+      "removed": [
+        "2601.04618v1",
+        "2601.04524v1",
+        "2601.04646v1",
+        "2601.04531v1"
+      ],
+      "common": [
+        "2601.05099v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-13",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.05590v1",
+        "2601.05549v1",
+        "2601.05200v1",
+        "2601.05588v1",
+        "2601.05567v1"
+      ],
+      "reranked_top_5": [
+        "2601.04878v1",
+        "2601.04853v1",
+        "2601.05163v1",
+        "2601.04859v1",
+        "2601.05567v1"
+      ],
+      "added": [
+        "2601.04878v1",
+        "2601.04853v1",
+        "2601.05163v1",
+        "2601.04859v1"
+      ],
+      "removed": [
+        "2601.05590v1",
+        "2601.05200v1",
+        "2601.05588v1",
+        "2601.05549v1"
+      ],
+      "common": [
+        "2601.05567v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-14",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.06564v1",
+        "2601.05461v1",
+        "2601.06389v1",
+        "2601.06603v1",
+        "2601.05649v1"
+      ],
+      "reranked_top_5": [
+        "2601.05465v1",
+        "2601.06021v1",
+        "2601.05461v1",
+        "2601.05503v1",
+        "2601.06603v1"
+      ],
+      "added": [
+        "2601.05503v1",
+        "2601.06021v1",
+        "2601.05465v1"
+      ],
+      "removed": [
+        "2601.06389v1",
+        "2601.05649v1",
+        "2601.06564v1"
+      ],
+      "common": [
+        "2601.06603v1",
+        "2601.05461v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-15",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.06974v1",
+        "2601.06992v1",
+        "2601.06799v1",
+        "2601.06519v1",
+        "2601.06943v1"
+      ],
+      "reranked_top_5": [
+        "2601.06676v1",
+        "2601.06922v1",
+        "2601.06490v1",
+        "2601.06799v1",
+        "2601.06842v1"
+      ],
+      "added": [
+        "2601.06490v1",
+        "2601.06676v1",
+        "2601.06842v1",
+        "2601.06922v1"
+      ],
+      "removed": [
+        "2601.06519v1",
+        "2601.06943v1",
+        "2601.06974v1",
+        "2601.06992v1"
+      ],
+      "common": [
+        "2601.06799v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-16",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.07528v1",
+        "2601.07054v1",
+        "2601.07533v1",
+        "2601.06979v1",
+        "2601.07684v1"
+      ],
+      "reranked_top_5": [
+        "2601.07711v1",
+        "2601.07054v1",
+        "2601.06922v1",
+        "2601.07192v1",
+        "2601.07606v1"
+      ],
+      "added": [
+        "2601.07192v1",
+        "2601.07606v1",
+        "2601.07711v1",
+        "2601.06922v1"
+      ],
+      "removed": [
+        "2601.06979v1",
+        "2601.07528v1",
+        "2601.07533v1",
+        "2601.07684v1"
+      ],
+      "common": [
+        "2601.07054v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-17",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.07782v1",
+        "2601.08282v1",
+        "2601.08363v1",
+        "2601.07125v1",
+        "2601.08283v1"
+      ],
+      "reranked_top_5": [
+        "2601.08536v1",
+        "2601.07711v1",
+        "2601.08282v1",
+        "2601.07192v1",
+        "2601.08699v1"
+      ],
+      "added": [
+        "2601.08699v1",
+        "2601.07192v1",
+        "2601.07711v1",
+        "2601.08536v1"
+      ],
+      "removed": [
+        "2601.07125v1",
+        "2601.07782v1",
+        "2601.08363v1",
+        "2601.08283v1"
+      ],
+      "common": [
+        "2601.08282v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-18",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.09562v2",
+        "2601.09523v1",
+        "2601.09278v1",
+        "2601.09036v1",
+        "2601.09028v1"
+      ],
+      "reranked_top_5": [
+        "2601.08536v1",
+        "2601.08747v2",
+        "2601.09278v1",
+        "2601.08699v1",
+        "2601.08621v1"
+      ],
+      "added": [
+        "2601.08699v1",
+        "2601.08621v1",
+        "2601.08747v2",
+        "2601.08536v1"
+      ],
+      "removed": [
+        "2601.09562v2",
+        "2601.09523v1",
+        "2601.09036v1",
+        "2601.09028v1"
+      ],
+      "common": [
+        "2601.09278v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-19",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.10581v1",
+        "2601.10215v1",
+        "2601.10003v1",
+        "2601.10020v1",
+        "2601.10321v1"
+      ],
+      "reranked_top_5": [
+        "2601.10029v1",
+        "2601.09688v1",
+        "2601.10108v1",
+        "2601.09402v1",
+        "2601.09504v1"
+      ],
+      "added": [
+        "2601.10029v1",
+        "2601.09504v1",
+        "2601.10108v1",
+        "2601.09688v1",
+        "2601.09402v1"
+      ],
+      "removed": [
+        "2601.10581v1",
+        "2601.10215v1",
+        "2601.10003v1",
+        "2601.10020v1",
+        "2601.10321v1"
+      ],
+      "common": [],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-20",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.11238v1",
+        "2601.10936v1",
+        "2601.10644v1",
+        "2601.11273v1",
+        "2601.10681v1"
+      ],
+      "reranked_top_5": [
+        "2601.10029v1",
+        "2601.10702v1",
+        "2601.10108v1",
+        "2601.11144v1",
+        "2601.11255v1"
+      ],
+      "added": [
+        "2601.10029v1",
+        "2601.11144v1",
+        "2601.10108v1",
+        "2601.10702v1",
+        "2601.11255v1"
+      ],
+      "removed": [
+        "2601.11238v1",
+        "2601.10936v1",
+        "2601.10644v1",
+        "2601.11273v1",
+        "2601.10681v1"
+      ],
+      "common": [],
+      "actual_positives": [
+        "2601.11238v1",
+        "2601.10936v1"
+      ],
+      "original_metrics": {
+        "precision": 0.4,
+        "recall": 1.0,
+        "f1": 0.5714285714285715
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": -0.4,
+        "recall": -1.0,
+        "f1": -0.5714285714285715
+      }
+    },
+    {
+      "day": "2026-01-21",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.11144v1",
+        "2601.11459v1",
+        "2601.11374v1",
+        "2601.11255v1",
+        "2601.10923v1"
+      ],
+      "reranked_top_5": [
+        "2601.11144v1",
+        "2601.11255v1",
+        "2601.11024v1",
+        "2601.10923v1",
+        "2601.11443v1"
+      ],
+      "added": [
+        "2601.11443v1",
+        "2601.11024v1"
+      ],
+      "removed": [
+        "2601.11459v1",
+        "2601.11374v1"
+      ],
+      "common": [
+        "2601.11144v1",
+        "2601.11255v1",
+        "2601.10923v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-22",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 14,
+      "original_top_k": [
+        "2601.12193v1",
+        "2601.12369v1",
+        "2601.12260v1",
+        "2601.12338v1",
+        "2601.12346v1"
+      ],
+      "reranked_top_5": [
+        "2601.12369v1",
+        "2601.12346v1",
+        "2601.12499v1",
+        "2601.12465v1",
+        "2601.12260v1"
+      ],
+      "added": [
+        "2601.12499v1",
+        "2601.12465v1"
+      ],
+      "removed": [
+        "2601.12193v1",
+        "2601.12338v1"
+      ],
+      "common": [
+        "2601.12369v1",
+        "2601.12346v1",
+        "2601.12260v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-24",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.13525v1",
+        "2601.13938v1",
+        "2601.14348v1",
+        "2601.13856v2",
+        "2601.14001v1"
+      ],
+      "reranked_top_5": [
+        "2601.13885v1",
+        "2601.13922v1",
+        "2601.13938v1",
+        "2601.13969v1",
+        "2601.14123v1"
+      ],
+      "added": [
+        "2601.14123v1",
+        "2601.13969v1",
+        "2601.13922v1",
+        "2601.13885v1"
+      ],
+      "removed": [
+        "2601.13856v2",
+        "2601.14348v1",
+        "2601.13525v1",
+        "2601.14001v1"
+      ],
+      "common": [
+        "2601.13938v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-25",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.14952v1",
+        "2601.14176v1",
+        "2601.14714v1",
+        "2601.14949v1",
+        "2601.14245v1"
+      ],
+      "reranked_top_5": [
+        "2601.14952v1",
+        "2601.13969v1",
+        "2601.14224v1",
+        "2601.14949v1",
+        "2601.15170v1"
+      ],
+      "added": [
+        "2601.15170v1",
+        "2601.13969v1",
+        "2601.14224v1"
+      ],
+      "removed": [
+        "2601.14245v1",
+        "2601.14176v1",
+        "2601.14714v1"
+      ],
+      "common": [
+        "2601.14952v1",
+        "2601.14949v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-26",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.15434v1",
+        "2601.15487v1",
+        "2601.15518v1",
+        "2601.15860v1",
+        "2601.15678v1"
+      ],
+      "reranked_top_5": [
+        "2601.15487v1",
+        "2601.14662v1",
+        "2601.15678v1",
+        "2601.15709v1",
+        "2601.15160v1"
+      ],
+      "added": [
+        "2601.15160v1",
+        "2601.15709v1",
+        "2601.14662v1"
+      ],
+      "removed": [
+        "2601.15518v1",
+        "2601.15434v1",
+        "2601.15860v1"
+      ],
+      "common": [
+        "2601.15487v1",
+        "2601.15678v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-27",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.16503v1",
+        "2601.15849v1",
+        "2601.16478v1",
+        "2601.16462v1",
+        "2601.16282v1"
+      ],
+      "reranked_top_5": [
+        "2601.16478v1",
+        "2601.16344v1",
+        "2601.16282v1",
+        "2601.16462v1",
+        "2601.16503v1"
+      ],
+      "added": [
+        "2601.16344v1"
+      ],
+      "removed": [
+        "2601.15849v1"
+      ],
+      "common": [
+        "2601.16462v1",
+        "2601.16282v1",
+        "2601.16503v1",
+        "2601.16478v1"
+      ],
+      "actual_positives": [
+        "2601.16478v1"
+      ],
+      "original_metrics": {
+        "precision": 0.2,
+        "recall": 1.0,
+        "f1": 0.33333333333333337
+      },
+      "reranked_metrics": {
+        "precision": 0.2,
+        "recall": 1.0,
+        "f1": 0.33333333333333337
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-28",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.17339v1",
+        "2601.17359v1",
+        "2601.16934v1",
+        "2601.17212v1",
+        "2601.17532v1"
+      ],
+      "reranked_top_5": [
+        "2601.17173v1",
+        "2601.17532v1",
+        "2601.17212v1",
+        "2601.16858v1",
+        "2601.16555v1"
+      ],
+      "added": [
+        "2601.16858v1",
+        "2601.17173v1",
+        "2601.16555v1"
+      ],
+      "removed": [
+        "2601.16934v1",
+        "2601.17359v1",
+        "2601.17339v1"
+      ],
+      "common": [
+        "2601.17212v1",
+        "2601.17532v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-29",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.17333v1",
+        "2601.17755v1",
+        "2601.17692v1",
+        "2601.17826v1",
+        "2601.17502v1"
+      ],
+      "reranked_top_5": [
+        "2601.17716v1",
+        "2601.17617v1",
+        "2601.17755v1",
+        "2601.17596v1",
+        "2601.17814v1"
+      ],
+      "added": [
+        "2601.17617v1",
+        "2601.17814v1",
+        "2601.17716v1",
+        "2601.17596v1"
+      ],
+      "removed": [
+        "2601.17826v1",
+        "2601.17333v1",
+        "2601.17692v1",
+        "2601.17502v1"
+      ],
+      "common": [
+        "2601.17755v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-30",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.18203v2",
+        "2601.18524v1",
+        "2601.18374v1",
+        "2601.18207v1",
+        "2601.18202v1"
+      ],
+      "reranked_top_5": [
+        "2601.18116v1",
+        "2601.18202v1",
+        "2601.18207v1",
+        "2601.18217v1",
+        "2601.18267v1"
+      ],
+      "added": [
+        "2601.18217v1",
+        "2601.18267v1",
+        "2601.18116v1"
+      ],
+      "removed": [
+        "2601.18203v2",
+        "2601.18524v1",
+        "2601.18374v1"
+      ],
+      "common": [
+        "2601.18207v1",
+        "2601.18202v1"
+      ],
+      "actual_positives": [
+        "2601.18207v1"
+      ],
+      "original_metrics": {
+        "precision": 0.2,
+        "recall": 1.0,
+        "f1": 0.33333333333333337
+      },
+      "reranked_metrics": {
+        "precision": 0.2,
+        "recall": 1.0,
+        "f1": 0.33333333333333337
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-31",
+      "query": "Information retrieval from scientific literature and cross-disciplinary sources for tasks such as text ranking, information extraction, and question answering",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.18777v1",
+        "2601.18356v1",
+        "2601.19535v1",
+        "2601.18496v1",
+        "2601.18116v1"
+      ],
+      "reranked_top_5": [
+        "2601.18116v1",
+        "2601.18267v1",
+        "2601.18579v1",
+        "2601.18747v1",
+        "2601.19350v1"
+      ],
+      "added": [
+        "2601.19350v1",
+        "2601.18267v1",
+        "2601.18747v1",
+        "2601.18579v1"
+      ],
+      "removed": [
+        "2601.18356v1",
+        "2601.19535v1",
+        "2601.18777v1",
+        "2601.18496v1"
+      ],
+      "common": [
+        "2601.18116v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    }
+  ]
+}
