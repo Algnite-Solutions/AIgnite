@@ -1,0 +1,42 @@
+{
+  "user": "prc@tongji.edu.cn",
+  "train_ratio": 0.7,
+  "train_days": [
+    "2025-11-09",
+    "2025-11-12",
+    "2025-11-20",
+    "2025-12-06",
+    "2025-12-09"
+  ],
+  "val_days": [
+    "2025-12-14",
+    "2026-01-22",
+    "2026-02-12"
+  ],
+  "profile": {
+    "persona_definition": "The user is an AI researcher focused on evaluating and optimizing Large Language Models (LLMs) and Multimodal LLMs (MLLMs) for complex reasoning over long contexts and sequential data. Their primary interest lies in methodological comparisons for information processing\u2014such as contrasting Retrieval-Augmented Generation (RAG) with long-context windows, or exploring how different data representations (e.g., visual vs. textual) impact reasoning performance. They are particularly engaged with novel, functional evaluation frameworks (like QA-based assessments) applied to real-world, extensive data such as user behavior sequences and long documents/books.",
+    "negative_constraints": [
+      "Lower priority unless analyzing long-context handling or RAG: Papers that strictly introduce new domain-specific benchmark datasets (e.g., tabular reasoning, coding agents, general long-tail QA forums).",
+      "Lower priority unless applied to LLM reasoning pipelines: Traditional computer vision tasks, text-to-video generation, or model compression techniques (e.g., CNN tensor decomposition).",
+      "Lower priority unless tied to complex reasoning over long contexts: Basic adversarial robustness, minor text perturbation studies, or embedding brittleness.",
+      "Lower priority: Biological neuroscience, brain mapping, or direct visual-neural alignments."
+    ],
+    "ranking_heuristics": [
+      "Prioritize papers that directly compare the efficacy and efficiency of Retrieval-Augmented Generation (RAG) against long-context LLMs.",
+      "Elevate studies that investigate how structural or modality-based data representations (e.g., converting text sequences to images or graphs) affect an LLM's reasoning capabilities.",
+      "Favor research proposing innovative, automated evaluation frameworks (like QA-driven metrics) for difficult, long-form tasks (e.g., book summarization, complex user journeys) over standard dataset curation.",
+      "Look for practical applications that focus on extracting latent intents, structural patterns, or aspect-based summaries from extensive, dispersed information."
+    ]
+  },
+  "token_usage": {
+    "input_tokens": 5931,
+    "thoughts_tokens": 1353,
+    "total_tokens": 7714
+  },
+  "generated_at": "2026-02-23T15:24:03.059711",
+  "config": {
+    "model": "gemini-3.1-pro-preview",
+    "max_papers": 10,
+    "metadata_file": "results/prc@tongji.edu.cn_metadata.json"
+  }
+}

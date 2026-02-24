@@ -1,0 +1,55 @@
+{
+  "user": "Fang Guo",
+  "train_ratio": 0.7,
+  "train_days": [
+    "2025-11-12",
+    "2025-11-13",
+    "2025-11-20",
+    "2025-11-22",
+    "2025-12-04",
+    "2025-12-06",
+    "2025-12-07",
+    "2025-12-08",
+    "2025-12-09",
+    "2025-12-10",
+    "2025-12-11",
+    "2025-12-12",
+    "2025-12-13",
+    "2025-12-14",
+    "2025-12-15"
+  ],
+  "val_days": [
+    "2025-12-16",
+    "2025-12-17",
+    "2025-12-18",
+    "2025-12-21",
+    "2026-01-20",
+    "2026-01-27",
+    "2026-01-30"
+  ],
+  "profile": {
+    "persona_definition": "The user is an AI researcher focusing on the system-level capabilities of Large Language Models, particularly multi-agent ecosystems, autonomous environments, and rigorous evaluation methodologies. They are highly interested in how LLMs retrieve and process complex knowledge (e.g., multi-agent Knowledge Graph mapping, RAG vs. long-context evaluations) and prioritize papers that introduce broad, generalizable frameworks, environments, or benchmarks over narrow applications.",
+    "negative_constraints": [
+      "Lower priority for highly specialized, domain-specific NLP applications (e.g., medical metaphor extraction, point-of-interest recommendation, author disambiguation) unless they introduce a paradigm-shifting general framework.",
+      "Lower priority for narrow information extraction or traditional NLP sub-tasks (e.g., Named Entity Recognition, specific table parsing, entity role ranking).",
+      "Lower priority for low-level internal architectural tweaks (e.g., modified attention layers for knowledge injection) compared to system-level integrations like agentic workflows or RAG architectures."
+    ],
+    "ranking_heuristics": [
+      "Prioritize papers introducing multi-agent environments, open-world simulations, or autonomous collaborative AI systems.",
+      "Elevate papers that propose novel evaluation frameworks, benchmarks, or systematic performance comparisons (e.g., testing RAG vs. long-context models, or using QA-based frameworks to evaluate long summaries).",
+      "Favor research that addresses complex, large-scale knowledge integration (such as multi-agent database-to-KG mapping or deep analysis of reasoning across distributed documents).",
+      "Select systems and methodologies that are domain-agnostic and broadly applicable over tools built to solve highly specific, isolated datasets."
+    ]
+  },
+  "token_usage": {
+    "input_tokens": 5929,
+    "thoughts_tokens": 1381,
+    "total_tokens": 7681
+  },
+  "generated_at": "2026-02-23T15:35:28.320811",
+  "config": {
+    "model": "gemini-3.1-pro-preview",
+    "max_papers": 10,
+    "metadata_file": "results/Fang_Guo_metadata.json"
+  }
+}

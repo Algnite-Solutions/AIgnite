@@ -1,0 +1,1453 @@
+{
+  "user": "prc@tongji.edu.cn",
+  "profile_file": "results/profile_prc@tongji.edu.cn.json",
+  "prompt_used": "personalized_ranking_prompt",
+  "month": "2026-01",
+  "summary": {
+    "days_analyzed": 29,
+    "avg_original_f1": 0.01149425287356322,
+    "avg_reranked_f1": 0.01149425287356322,
+    "f1_change": 0.0,
+    "total_added": 93,
+    "total_removed": 98
+  },
+  "per_day_results": [
+    {
+      "day": "2026-01-01",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2512.22748v1",
+        "2512.22877v1",
+        "2512.22981v1",
+        "2512.22984v1",
+        "2512.22681v1"
+      ],
+      "reranked_top_5": [
+        "2512.22748v1",
+        "2512.22545v1",
+        "2512.22695v1",
+        "2512.22799v1",
+        "2512.22741v1"
+      ],
+      "added": [
+        "2512.22545v1",
+        "2512.22741v1",
+        "2512.22799v1",
+        "2512.22695v1"
+      ],
+      "removed": [
+        "2512.22681v1",
+        "2512.22984v1",
+        "2512.22877v1",
+        "2512.22981v1"
+      ],
+      "common": [
+        "2512.22748v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-03",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2512.23852v1",
+        "2512.24224v1",
+        "2512.23966v1",
+        "2512.23837v1",
+        "2512.24086v1"
+      ],
+      "reranked_top_5": [
+        "2512.24297v1",
+        "2512.23966v1",
+        "2512.23862v1",
+        "2512.23852v1",
+        "2512.23675v2"
+      ],
+      "added": [
+        "2512.24297v1",
+        "2512.23675v2",
+        "2512.23862v1"
+      ],
+      "removed": [
+        "2512.23837v1",
+        "2512.24086v1",
+        "2512.24224v1"
+      ],
+      "common": [
+        "2512.23966v1",
+        "2512.23852v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-04",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2512.24023v1",
+        "2512.24373v1",
+        "2512.24404v1",
+        "2512.24143v1",
+        "2512.24438v1"
+      ],
+      "reranked_top_5": [
+        "2512.24297v1",
+        "2512.24373v1",
+        "2512.24711v1",
+        "2512.24330v1",
+        "2512.24438v1"
+      ],
+      "added": [
+        "2512.24711v1",
+        "2512.24297v1",
+        "2512.24330v1"
+      ],
+      "removed": [
+        "2512.24404v1",
+        "2512.24023v1",
+        "2512.24143v1"
+      ],
+      "common": [
+        "2512.24373v1",
+        "2512.24438v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-05",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 13,
+      "original_top_k": [
+        "2512.24826v1",
+        "2512.24975v1",
+        "2512.25060v1",
+        "2512.25026v1",
+        "2512.24620v1"
+      ],
+      "reranked_top_5": [
+        "2512.25026v1",
+        "2512.24851v1",
+        "2512.24695v1",
+        "2512.24711v1",
+        "2512.24639v1"
+      ],
+      "added": [
+        "2512.24711v1",
+        "2512.24851v1",
+        "2512.24695v1",
+        "2512.24639v1"
+      ],
+      "removed": [
+        "2512.24826v1",
+        "2512.24620v1",
+        "2512.24975v1",
+        "2512.25060v1"
+      ],
+      "common": [
+        "2512.25026v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-06",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 10,
+      "original_top_k": [
+        "2601.00426v1",
+        "2601.00562v1",
+        "2601.00584v1",
+        "2601.00535v1",
+        "2601.00736v1"
+      ],
+      "reranked_top_5": [
+        "2601.00671v1",
+        "2601.00501v1",
+        "2601.00736v1",
+        "2601.00426v1",
+        "2601.00535v1"
+      ],
+      "added": [
+        "2601.00671v1",
+        "2601.00501v1"
+      ],
+      "removed": [
+        "2601.00562v1",
+        "2601.00584v1"
+      ],
+      "common": [
+        "2601.00426v1",
+        "2601.00736v1",
+        "2601.00535v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-07",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.01024v1",
+        "2601.01002v1",
+        "2601.01167v1",
+        "2601.01089v1",
+        "2601.01013v1"
+      ],
+      "reranked_top_5": [
+        "2601.00671v1",
+        "2601.01024v1",
+        "2601.01062v1",
+        "2601.01011v1",
+        "2601.00777v1"
+      ],
+      "added": [
+        "2601.01062v1",
+        "2601.00671v1",
+        "2601.00777v1",
+        "2601.01011v1"
+      ],
+      "removed": [
+        "2601.01167v1",
+        "2601.01002v1",
+        "2601.01089v1",
+        "2601.01013v1"
+      ],
+      "common": [
+        "2601.01024v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-08",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.01024v1",
+        "2601.01167v1",
+        "2601.01408v1",
+        "2601.01089v1",
+        "2601.01290v1"
+      ],
+      "reranked_top_5": [
+        "2601.01313v1",
+        "2601.01322v1",
+        "2601.02422v1",
+        "2601.01024v1",
+        "2601.01011v1"
+      ],
+      "added": [
+        "2601.01322v1",
+        "2601.02422v1",
+        "2601.01313v1",
+        "2601.01011v1"
+      ],
+      "removed": [
+        "2601.01290v1",
+        "2601.01167v1",
+        "2601.01408v1",
+        "2601.01089v1"
+      ],
+      "common": [
+        "2601.01024v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-09",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.01870v1",
+        "2601.01818v1",
+        "2601.02211v1",
+        "2601.02441v1",
+        "2601.02046v1"
+      ],
+      "reranked_top_5": [
+        "2601.01322v1",
+        "2601.01984v1",
+        "2601.02147v1",
+        "2601.02204v1",
+        "2601.02441v1"
+      ],
+      "added": [
+        "2601.02147v1",
+        "2601.02204v1",
+        "2601.01984v1",
+        "2601.01322v1"
+      ],
+      "removed": [
+        "2601.01870v1",
+        "2601.01818v1",
+        "2601.02211v1",
+        "2601.02046v1"
+      ],
+      "common": [
+        "2601.02441v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-10",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.02918v1",
+        "2601.03329v1",
+        "2601.02987v1",
+        "2601.02771v1",
+        "2601.03054v1"
+      ],
+      "reranked_top_5": [
+        "2601.03329v1",
+        "2601.02819v1",
+        "2601.03043v1",
+        "2601.03100v1",
+        "2601.01984v1"
+      ],
+      "added": [
+        "2601.01984v1",
+        "2601.02819v1",
+        "2601.03043v1",
+        "2601.03100v1"
+      ],
+      "removed": [
+        "2601.02918v1",
+        "2601.02771v1",
+        "2601.02987v1",
+        "2601.03054v1"
+      ],
+      "common": [
+        "2601.03329v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-11",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.03741v1",
+        "2601.03400v1",
+        "2601.03928v1",
+        "2601.04098v1",
+        "2601.03609v1"
+      ],
+      "reranked_top_5": [
+        "2601.02819v1",
+        "2601.03043v1",
+        "2601.04098v1",
+        "2601.03928v1",
+        "2601.03199v1"
+      ],
+      "added": [
+        "2601.03199v1",
+        "2601.02819v1",
+        "2601.03043v1"
+      ],
+      "removed": [
+        "2601.03741v1",
+        "2601.03609v1",
+        "2601.03400v1"
+      ],
+      "common": [
+        "2601.03928v1",
+        "2601.04098v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-12",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.04342v1",
+        "2601.04480v1",
+        "2601.05124v1",
+        "2601.04398v1",
+        "2601.05127v1"
+      ],
+      "reranked_top_5": [
+        "2601.04897v1",
+        "2601.05038v1",
+        "2601.04571v1",
+        "2601.04480v1",
+        "2601.04398v1"
+      ],
+      "added": [
+        "2601.04897v1",
+        "2601.04571v1",
+        "2601.05038v1"
+      ],
+      "removed": [
+        "2601.04342v1",
+        "2601.05127v1",
+        "2601.05124v1"
+      ],
+      "common": [
+        "2601.04398v1",
+        "2601.04480v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-13",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.05201v1",
+        "2601.05851v1",
+        "2601.05344v1",
+        "2601.05470v1",
+        "2601.05328v1"
+      ],
+      "reranked_top_5": [
+        "2601.05470v1",
+        "2601.05201v1",
+        "2601.05547v1",
+        "2601.05939v1",
+        "2601.05328v1"
+      ],
+      "added": [
+        "2601.05547v1",
+        "2601.05939v1"
+      ],
+      "removed": [
+        "2601.05851v1",
+        "2601.05344v1"
+      ],
+      "common": [
+        "2601.05470v1",
+        "2601.05328v1",
+        "2601.05201v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-14",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.06458v1",
+        "2601.06338v1",
+        "2601.06257v1",
+        "2601.05563v1",
+        "2601.06605v1"
+      ],
+      "reranked_top_5": [
+        "2601.05866v1",
+        "2601.05939v1",
+        "2601.05547v1",
+        "2601.06458v1",
+        "2601.06394v1"
+      ],
+      "added": [
+        "2601.05547v1",
+        "2601.06394v1",
+        "2601.05866v1",
+        "2601.05939v1"
+      ],
+      "removed": [
+        "2601.06338v1",
+        "2601.06257v1",
+        "2601.05563v1",
+        "2601.06605v1"
+      ],
+      "common": [
+        "2601.06458v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-15",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.06891v1",
+        "2601.06700v1",
+        "2601.06566v1",
+        "2601.06899v1",
+        "2601.06862v1"
+      ],
+      "reranked_top_5": [
+        "2601.06787v1",
+        "2601.06899v1",
+        "2601.06993v1",
+        "2601.06424v1",
+        "2601.06676v1"
+      ],
+      "added": [
+        "2601.06424v1",
+        "2601.06676v1",
+        "2601.06993v1",
+        "2601.06787v1"
+      ],
+      "removed": [
+        "2601.06891v1",
+        "2601.06700v1",
+        "2601.06862v1",
+        "2601.06566v1"
+      ],
+      "common": [
+        "2601.06899v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-16",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.07359v1",
+        "2601.07645v1",
+        "2601.07422v1",
+        "2601.07310v1",
+        "2601.07894v1"
+      ],
+      "reranked_top_5": [
+        "2601.07359v1",
+        "2601.07645v1",
+        "2601.07422v1",
+        "2601.07894v1",
+        "2601.07329v1"
+      ],
+      "added": [
+        "2601.07329v1"
+      ],
+      "removed": [
+        "2601.07310v1"
+      ],
+      "common": [
+        "2601.07894v1",
+        "2601.07645v1",
+        "2601.07359v1",
+        "2601.07422v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-17",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.08151v1",
+        "2601.07998v1",
+        "2601.07812v1",
+        "2601.08341v1",
+        "2601.07287v1"
+      ],
+      "reranked_top_5": [
+        "2601.08151v1",
+        "2601.07812v1",
+        "2601.07329v1",
+        "2601.08226v1",
+        "2601.07832v2"
+      ],
+      "added": [
+        "2601.08226v1",
+        "2601.07329v1",
+        "2601.07832v2"
+      ],
+      "removed": [
+        "2601.07998v1",
+        "2601.08341v1",
+        "2601.07287v1"
+      ],
+      "common": [
+        "2601.08151v1",
+        "2601.07812v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-18",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.09008v1",
+        "2601.08321v1",
+        "2601.09410v1",
+        "2601.08750v1",
+        "2601.09220v1"
+      ],
+      "reranked_top_5": [
+        "2601.08226v1",
+        "2601.09536v1",
+        "2601.08758v2",
+        "2601.08297v1",
+        "2601.09220v1"
+      ],
+      "added": [
+        "2601.08758v2",
+        "2601.08297v1",
+        "2601.08226v1",
+        "2601.09536v1"
+      ],
+      "removed": [
+        "2601.09410v1",
+        "2601.09008v1",
+        "2601.08321v1",
+        "2601.08750v1"
+      ],
+      "common": [
+        "2601.09220v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-19",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.09954v1",
+        "2601.09298v1",
+        "2601.10244v1",
+        "2601.10129v1",
+        "2601.10053v1"
+      ],
+      "reranked_top_5": [
+        "2601.10378v1",
+        "2601.10129v1",
+        "2601.10215v1",
+        "2601.09954v1",
+        "2601.10266v1"
+      ],
+      "added": [
+        "2601.10215v1",
+        "2601.10266v1",
+        "2601.10378v1"
+      ],
+      "removed": [
+        "2601.09298v1",
+        "2601.10053v1",
+        "2601.10244v1"
+      ],
+      "common": [
+        "2601.09954v1",
+        "2601.10129v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-20",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.10854v1",
+        "2601.11108v1",
+        "2601.10107v1",
+        "2601.11322v1",
+        "2601.11164v1"
+      ],
+      "reranked_top_5": [
+        "2601.10378v1",
+        "2601.10215v1",
+        "2601.11020v1",
+        "2601.10710v1",
+        "2601.11151v1"
+      ],
+      "added": [
+        "2601.10710v1",
+        "2601.10215v1",
+        "2601.11151v1",
+        "2601.11020v1",
+        "2601.10378v1"
+      ],
+      "removed": [
+        "2601.10854v1",
+        "2601.11108v1",
+        "2601.10107v1",
+        "2601.11322v1",
+        "2601.11164v1"
+      ],
+      "common": [],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-21",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.10953v1",
+        "2601.11045v1",
+        "2601.11194v1",
+        "2601.11310v1",
+        "2601.11020v1"
+      ],
+      "reranked_top_5": [
+        "2601.11020v1",
+        "2601.11464v1",
+        "2601.11471v1",
+        "2601.11359v1",
+        "2601.11109v1"
+      ],
+      "added": [
+        "2601.11109v1",
+        "2601.11464v1",
+        "2601.11359v1",
+        "2601.11471v1"
+      ],
+      "removed": [
+        "2601.11310v1",
+        "2601.10953v1",
+        "2601.11045v1",
+        "2601.11194v1"
+      ],
+      "common": [
+        "2601.11020v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-22",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.12499v1",
+        "2601.12430v1",
+        "2601.12316v1",
+        "2601.12283v1",
+        "2601.12145v1"
+      ],
+      "reranked_top_5": [
+        "2601.12499v1",
+        "2601.12430v1",
+        "2601.12145v1",
+        "2601.12260v1",
+        "2601.12346v1"
+      ],
+      "added": [
+        "2601.12260v1",
+        "2601.12346v1"
+      ],
+      "removed": [
+        "2601.12316v1",
+        "2601.12283v1"
+      ],
+      "common": [
+        "2601.12499v1",
+        "2601.12145v1",
+        "2601.12430v1"
+      ],
+      "actual_positives": [
+        "2601.12499v1"
+      ],
+      "original_metrics": {
+        "precision": 0.2,
+        "recall": 1.0,
+        "f1": 0.33333333333333337
+      },
+      "reranked_metrics": {
+        "precision": 0.2,
+        "recall": 1.0,
+        "f1": 0.33333333333333337
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-24",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.14052v1",
+        "2601.14152v1",
+        "2601.13683v1",
+        "2601.13505v1",
+        "2601.13942v1"
+      ],
+      "reranked_top_5": [
+        "2601.14152v1",
+        "2601.13505v1",
+        "2601.13684v1",
+        "2601.13879v2",
+        "2601.13707v1"
+      ],
+      "added": [
+        "2601.13879v2",
+        "2601.13707v1",
+        "2601.13684v1"
+      ],
+      "removed": [
+        "2601.13683v1",
+        "2601.14052v1",
+        "2601.13942v1"
+      ],
+      "common": [
+        "2601.14152v1",
+        "2601.13505v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-25",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.14714v1",
+        "2601.14112v2",
+        "2601.13856v2",
+        "2601.14440v1",
+        "2601.14802v1"
+      ],
+      "reranked_top_5": [
+        "2601.13684v1",
+        "2601.14440v1",
+        "2601.14697v1",
+        "2601.13707v1",
+        "2601.14112v2"
+      ],
+      "added": [
+        "2601.14697v1",
+        "2601.13707v1",
+        "2601.13684v1"
+      ],
+      "removed": [
+        "2601.14802v1",
+        "2601.14714v1",
+        "2601.13856v2"
+      ],
+      "common": [
+        "2601.14112v2",
+        "2601.14440v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-26",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.16065v1",
+        "2601.15380v1",
+        "2601.15356v1",
+        "2601.14774v1",
+        "2601.15275v1"
+      ],
+      "reranked_top_5": [
+        "2601.15380v1",
+        "2601.16065v1",
+        "2601.14697v1",
+        "2601.16093v1",
+        "2601.15275v1"
+      ],
+      "added": [
+        "2601.16093v1",
+        "2601.14697v1"
+      ],
+      "removed": [
+        "2601.15356v1",
+        "2601.14774v1"
+      ],
+      "common": [
+        "2601.15380v1",
+        "2601.15275v1",
+        "2601.16065v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-27",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.16603v1",
+        "2601.16155v1",
+        "2601.16397v1",
+        "2601.16644v1",
+        "2601.16803v1"
+      ],
+      "reranked_top_5": [
+        "2601.16397v1",
+        "2601.16644v1",
+        "2601.16093v1",
+        "2601.15906v1",
+        "2601.16407v1"
+      ],
+      "added": [
+        "2601.15906v1",
+        "2601.16407v1",
+        "2601.16093v1"
+      ],
+      "removed": [
+        "2601.16155v1",
+        "2601.16603v1",
+        "2601.16803v1"
+      ],
+      "common": [
+        "2601.16397v1",
+        "2601.16644v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-28",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.16407v1",
+        "2601.17340v1",
+        "2601.17367v1",
+        "2601.17334v1",
+        "2601.16442v1"
+      ],
+      "reranked_top_5": [
+        "2601.17367v1",
+        "2601.17334v1",
+        "2601.16934v1",
+        "2601.16582v1",
+        "2601.17420v1"
+      ],
+      "added": [
+        "2601.17420v1",
+        "2601.16582v1",
+        "2601.16934v1"
+      ],
+      "removed": [
+        "2601.16442v1",
+        "2601.16407v1",
+        "2601.17340v1"
+      ],
+      "common": [
+        "2601.17367v1",
+        "2601.17334v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-29",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.17555v1",
+        "2601.17706v1",
+        "2601.17702v1",
+        "2601.17644v2",
+        "2601.17676v1"
+      ],
+      "reranked_top_5": [
+        "2601.17702v1",
+        "2601.17836v1",
+        "2601.17644v2",
+        "2601.17676v1",
+        "2601.17706v1"
+      ],
+      "added": [
+        "2601.17836v1"
+      ],
+      "removed": [
+        "2601.17555v1"
+      ],
+      "common": [
+        "2601.17644v2",
+        "2601.17706v1",
+        "2601.17702v1",
+        "2601.17676v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-30",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 25,
+      "original_top_k": [
+        "2601.17781v1",
+        "2601.17862v1",
+        "2601.17666v1",
+        "2601.17753v1",
+        "2601.17802v1",
+        "2601.17679v1",
+        "2601.17879v1",
+        "2601.17678v1",
+        "2601.17836v1",
+        "2601.17699v1"
+      ],
+      "reranked_top_5": [
+        "2601.17836v1",
+        "2601.17844v1",
+        "2601.17879v1",
+        "2601.17761v1",
+        "2601.17673v1"
+      ],
+      "added": [
+        "2601.17761v1",
+        "2601.17844v1",
+        "2601.17673v1"
+      ],
+      "removed": [
+        "2601.17862v1",
+        "2601.17781v1",
+        "2601.17666v1",
+        "2601.17753v1",
+        "2601.17802v1",
+        "2601.17679v1",
+        "2601.17678v1",
+        "2601.17699v1"
+      ],
+      "common": [
+        "2601.17836v1",
+        "2601.17879v1"
+      ],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    {
+      "day": "2026-01-31",
+      "query": "I am interested in research on attention mechanisms, particularly in the context of text and image processing.",
+      "retrieve_count": 20,
+      "original_top_k": [
+        "2601.19960v1",
+        "2601.19798v1",
+        "2601.18065v1",
+        "2601.18970v1",
+        "2601.20881v1"
+      ],
+      "reranked_top_5": [
+        "2601.18203v2",
+        "2601.19060v1",
+        "2601.18356v1",
+        "2601.18401v1",
+        "2601.19611v1"
+      ],
+      "added": [
+        "2601.19611v1",
+        "2601.18401v1",
+        "2601.18203v2",
+        "2601.19060v1",
+        "2601.18356v1"
+      ],
+      "removed": [
+        "2601.19960v1",
+        "2601.19798v1",
+        "2601.18065v1",
+        "2601.18970v1",
+        "2601.20881v1"
+      ],
+      "common": [],
+      "actual_positives": [],
+      "original_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "reranked_metrics": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "metrics_change": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    }
+  ]
+}
