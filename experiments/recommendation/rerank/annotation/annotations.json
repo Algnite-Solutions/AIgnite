@@ -1,0 +1,176 @@
+{
+  "user": "Qi Zhu",
+  "annotated_at": "2026-02-24T23:30:35.830386",
+  "total_papers": 178,
+  "annotated_count": 21,
+  "annotations": [
+    {
+      "day": "2026-01-01",
+      "query": "I'm interested in techniques related to using reinforcement learning and visual token compression (such as DeepSeek OCR) in context engineering.",
+      "paper_id": "2512.22716v1",
+      "actual_source": "removed",
+      "label": "non_relevant",
+      "annotated_at": "2026-02-24T19:43:42.097814"
+    },
+    {
+      "day": "2026-01-01",
+      "query": "I'm interested in techniques related to using reinforcement learning and visual token compression (such as DeepSeek OCR) in context engineering.",
+      "paper_id": "2512.22944v1",
+      "actual_source": "added",
+      "label": "non_relevant",
+      "annotated_at": "2026-02-24T19:47:06.176855"
+    },
+    {
+      "day": "2026-01-03",
+      "query": "I'm interested in techniques related to using reinforcement learning and visual token compression (such as DeepSeek OCR) in context engineering.",
+      "paper_id": "2512.24330v1",
+      "actual_source": "removed",
+      "label": "relevant",
+      "annotated_at": "2026-02-24T19:49:06.723358"
+    },
+    {
+      "day": "2026-01-03",
+      "query": "I'm interested in techniques related to using reinforcement learning and visual token compression (such as DeepSeek OCR) in context engineering.",
+      "paper_id": "2512.23647v1",
+      "actual_source": "removed",
+      "label": "non_relevant",
+      "annotated_at": "2026-02-24T19:57:44.343954"
+    },
+    {
+      "day": "2026-01-03",
+      "query": "I'm interested in techniques related to using reinforcement learning and visual token compression (such as DeepSeek OCR) in context engineering.",
+      "paper_id": "2512.24023v1",
+      "actual_source": "removed",
+      "label": "non_relevant",
+      "annotated_at": "2026-02-24T20:00:26.508383"
+    },
+    {
+      "day": "2026-01-03",
+      "query": "I'm interested in techniques related to using reinforcement learning and visual token compression (such as DeepSeek OCR) in context engineering.",
+      "paper_id": "2512.23852v1",
+      "actual_source": "added",
+      "label": "non_relevant",
+      "annotated_at": "2026-02-24T20:01:51.217742"
+    },
+    {
+      "day": "2026-01-03",
+      "query": "I'm interested in techniques related to using reinforcement learning and visual token compression (such as DeepSeek OCR) in context engineering.",
+      "paper_id": "2512.23966v1",
+      "actual_source": "added",
+      "label": "relevant",
+      "annotated_at": "2026-02-24T20:02:33.875413"
+    },
+    {
+      "day": "2026-01-03",
+      "query": "I'm interested in techniques related to using reinforcement learning and visual token compression (such as DeepSeek OCR) in context engineering.",
+      "paper_id": "2512.23675v2",
+      "actual_source": "added",
+      "label": "relevant",
+      "annotated_at": "2026-02-24T20:12:52.095929"
+    },
+    {
+      "day": "2026-01-04",
+      "query": "I'm interested in techniques related to using reinforcement learning and visual token compression (such as DeepSeek OCR) in context engineering.",
+      "paper_id": "2512.24532v1",
+      "actual_source": "removed",
+      "label": "non_relevant",
+      "annotated_at": "2026-02-24T20:18:58.159654"
+    },
+    {
+      "day": "2026-01-04",
+      "query": "I'm interested in techniques related to using reinforcement learning and visual token compression (such as DeepSeek OCR) in context engineering.",
+      "paper_id": "2512.24373v1",
+      "actual_source": "added",
+      "label": "non_relevant",
+      "annotated_at": "2026-02-24T20:19:16.672499"
+    },
+    {
+      "day": "2026-01-04",
+      "query": "I'm interested in techniques related to using reinforcement learning and visual token compression (such as DeepSeek OCR) in context engineering.",
+      "paper_id": "2512.23966v1",
+      "actual_source": "added",
+      "label": "relevant",
+      "annotated_at": "2026-02-24T20:19:21.356307"
+    },
+    {
+      "day": "2026-01-04",
+      "query": "I'm interested in techniques related to using reinforcement learning and visual token compression (such as DeepSeek OCR) in context engineering.",
+      "paper_id": "2512.24284v1",
+      "actual_source": "removed",
+      "label": "non_relevant",
+      "annotated_at": "2026-02-24T20:19:31.290432"
+    },
+    {
+      "day": "2026-01-04",
+      "query": "I'm interested in techniques related to using reinforcement learning and visual token compression (such as DeepSeek OCR) in context engineering.",
+      "paper_id": "2512.24601v1",
+      "actual_source": "added",
+      "label": "relevant",
+      "annotated_at": "2026-02-24T20:19:35.223435"
+    },
+    {
+      "day": "2026-01-04",
+      "query": "I'm interested in techniques related to using reinforcement learning and visual token compression (such as DeepSeek OCR) in context engineering.",
+      "paper_id": "2512.24940v1",
+      "actual_source": "removed",
+      "label": "relevant",
+      "annotated_at": "2026-02-24T23:12:02.524219"
+    },
+    {
+      "day": "2026-01-05",
+      "query": "I'm interested in techniques related to using reinforcement learning and visual token compression (such as DeepSeek OCR) in context engineering.",
+      "paper_id": "2512.25023v1",
+      "actual_source": "added",
+      "label": "relevant",
+      "annotated_at": "2026-02-24T23:24:29.029973"
+    },
+    {
+      "day": "2026-01-05",
+      "query": "I'm interested in techniques related to using reinforcement learning and visual token compression (such as DeepSeek OCR) in context engineering.",
+      "paper_id": "2512.25066v1",
+      "actual_source": "removed",
+      "label": "non_relevant",
+      "annotated_at": "2026-02-24T23:28:23.029544"
+    },
+    {
+      "day": "2026-01-05",
+      "query": "I'm interested in techniques related to using reinforcement learning and visual token compression (such as DeepSeek OCR) in context engineering.",
+      "paper_id": "2512.24826v1",
+      "actual_source": "removed",
+      "label": "non_relevant",
+      "annotated_at": "2026-02-24T23:28:28.797155"
+    },
+    {
+      "day": "2026-01-05",
+      "query": "I'm interested in techniques related to using reinforcement learning and visual token compression (such as DeepSeek OCR) in context engineering.",
+      "paper_id": "2512.24547v1",
+      "actual_source": "added",
+      "label": "non_relevant",
+      "annotated_at": "2026-02-24T23:28:39.647368"
+    },
+    {
+      "day": "2026-01-06",
+      "query": "I'm interested in techniques related to using reinforcement learning and visual token compression (such as DeepSeek OCR) in context engineering.",
+      "paper_id": "2601.00610v1",
+      "actual_source": "removed",
+      "label": "non_relevant",
+      "annotated_at": "2026-02-24T23:28:43.729784"
+    },
+    {
+      "day": "2026-01-06",
+      "query": "I'm interested in techniques related to using reinforcement learning and visual token compression (such as DeepSeek OCR) in context engineering.",
+      "paper_id": "2601.00675v1",
+      "actual_source": "removed",
+      "label": "non_relevant",
+      "annotated_at": "2026-02-24T23:28:51.546623"
+    },
+    {
+      "day": "2026-01-06",
+      "query": "I'm interested in techniques related to using reinforcement learning and visual token compression (such as DeepSeek OCR) in context engineering.",
+      "paper_id": "2601.00671v1",
+      "actual_source": "added",
+      "label": "relevant",
+      "annotated_at": "2026-02-24T23:30:35.830347"
+    }
+  ]
+}
