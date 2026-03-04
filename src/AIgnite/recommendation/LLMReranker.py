@@ -130,7 +130,7 @@ class GeminiRerankerPDF:
     A class to rerank retrieved documents using the Gemini model with PDF support.
     This version passes only the first page of PDF files directly to Gemini's API.
     """
-    def __init__(self, model_name="gemini-2.5-pro", prompt_key="blog_rerank_pdf_prompt",
+    def __init__(self, prompt_path = None,model_name="gemini-2.5-pro", prompt_key="blog_rerank_pdf_prompt",
                  enable_thinking=True):
         """
         Initialize the PDF-based Gemini reranker.
@@ -148,12 +148,15 @@ class GeminiRerankerPDF:
         self.enable_thinking = enable_thinking
 
         # Load prompts
-        prompt_path = Path(__file__).parent / "rerank_prompts.yaml"
+        if not prompt_path:
+            prompt_path = Path(__file__).parent / "rerank_prompts.yaml"
+        self.prompt_key = prompt_key
         with open(prompt_path, 'r') as f:
             prompts = yaml.safe_load(f)
             self.rerank_prompt_template = prompts[prompt_key]
+            self.personalized_prompt_template = prompts.get("personalized_ranking_prompt")
 
-    def rerank(self, query, pdf_paths_dict, retrieve_ids, top_k=5):
+    def rerank(self, query, pdf_paths_dict, retrieve_ids, top_k=5, user_profile=None):
         """
         Rerank retrieved documents based on query relevance using PDF first pages.
 
@@ -203,12 +206,28 @@ class GeminiRerankerPDF:
         # Now construct the prompt using the template
         # First add all the document parts
         contents.extend(documents_text_parts)
-
         # Then add the formatted prompt
-        prompt = self.rerank_prompt_template.format(
-            documents_text="[PDFs are provided above with Document IDs]",
-            user_interest_description=query
-        )
+
+        if user_profile is not None and self.personalized_prompt_template:
+            neg_constraints = user_profile.get("negative_constraints", [])
+            heuristics = user_profile.get("ranking_heuristics", [])
+            
+            neg_constraints_str = "\n".join(f"- {c}" for c in neg_constraints) if neg_constraints else "None"
+            heuristics_str = "\n".join(f"- {h}" for h in heuristics) if heuristics else "None"
+            
+            query_str = query if isinstance(query, str) else query.get("user_interest_description", "")
+            prompt = self.personalized_prompt_template.format(
+                documents_text="[PDFs are provided above with Document IDs]",
+                persona_definition=user_profile.get("persona_definition", ""),
+                negative_constraints=neg_constraints_str,
+                ranking_heuristics=heuristics_str,
+                user_interest_description=query_str
+            )
+        else:
+            prompt = self.rerank_prompt_template.format(
+                documents_text="[PDFs are provided above with Document IDs]",
+                user_interest_description=query if isinstance(query, str) else str(query)
+            )
 
         contents.append(prompt)
 
@@ -225,7 +244,7 @@ class GeminiRerankerPDF:
                 config=types.GenerateContentConfig(**config_params) if config_params else None,
                 contents=contents
             )
-
+            
             # Extract thinking summary if available
             thought_summary = ""
             if self.enable_thinking:
