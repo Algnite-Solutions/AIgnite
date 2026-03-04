@@ -1,6 +1,6 @@
 """Database modules for AIgnite."""
 from typing import Dict, Any, Optional, List
-from datasets.features import image
+# from datasets.features import image  # Commented out: unused import causing ModuleNotFoundError
 from sqlalchemy import create_engine, Column, String, Integer, JSON, Text, LargeBinary, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, declared_attr

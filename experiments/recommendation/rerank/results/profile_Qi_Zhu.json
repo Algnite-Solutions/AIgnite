@@ -1,0 +1,49 @@
+{
+  "user": "Qi Zhu",
+  "train_ratio": 0.7,
+  "train_days": [
+    "2025-11-15",
+    "2025-11-16",
+    "2025-11-20",
+    "2025-11-24",
+    "2025-11-26",
+    "2025-11-29",
+    "2025-12-06",
+    "2025-12-07",
+    "2025-12-08",
+    "2025-12-09"
+  ],
+  "val_days": [
+    "2025-12-10",
+    "2025-12-11",
+    "2025-12-12",
+    "2025-12-13",
+    "2025-12-22"
+  ],
+  "profile": {
+    "persona_definition": "The user is an AI researcher heavily focused on computational efficiency, token reduction, and long-context processing in Large Language Models (LLMs) and Vision-Language Models (VLMs). Their primary interest lies in the intersection of context compression, efficient reasoning (e.g., accelerating Chain-of-Thought or RL training), and information-theoretic approaches to language modeling (e.g., entropy estimation, sparse attention, information bottlenecks). They seek foundational architectural and algorithmic improvements that reduce the quadratic cost of attention and long-tail generation without sacrificing model capabilities.",
+    "negative_constraints": [
+      "Lower priority unless focusing on core LLM token efficiency: Robotics, autonomous driving, and embodied AI/GUI agents.",
+      "Lower priority unless demonstrating novel token compression: Pure video understanding tasks, text-to-image/video generation, and segmentation.",
+      "Lower priority: Hardware-level memory management or traditional systems optimization (e.g., DLRM inference buffers) that do not innovate at the algorithmic/token level."
+    ],
+    "ranking_heuristics": [
+      "Prioritize papers explicitly addressing 'context compression', 'token reduction', 'sparse attention', or 'gist tokens'.",
+      "Elevate research that improves the efficiency of reasoning models, such as compressing Chain-of-Thought (CoT) paths, accelerating RL rollouts, or mitigating long-tail generation costs.",
+      "Favor principled, information-theoretic approaches to language modeling, such as using entropy estimation, predictability, or semantic boundaries to guide compression and generalization.",
+      "Highly rank major foundational model releases (e.g., DeepSeek-V3.x) that introduce significant architectural breakthroughs in context scaling or training efficiency.",
+      "When evaluating multimodal/retrieval papers, look for 'extreme compression' or dense representation techniques (e.g., token fusion, minimal vectors per page) rather than standard RAG or embedding applications."
+    ]
+  },
+  "token_usage": {
+    "input_tokens": 40154,
+    "thoughts_token_count": 3219,
+    "total_tokens": 43824
+  },
+  "generated_at": "2026-02-22T21:59:02.826625",
+  "config": {
+    "model": "gemini-3.1-pro-preview",
+    "max_papers": 100,
+    "metadata_file": "results/Qi_Zhu_metadata.json"
+  }
+}

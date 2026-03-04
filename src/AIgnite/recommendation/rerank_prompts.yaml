@@ -89,3 +89,177 @@ blog_rerank_pdf_prompt: |
   doc_id_4
   doc_id_5
   </Documents>
+
+
+personalized_ranking_prompt: |
+  # Academic Document Retrieval System (Personalized Mode)
+
+  ## Task Objective
+  Act as a **Research Scout** for a senior researcher. Your goal is to curate a reading list of 5 documents that best satisfy the user's **Research Interests** based on their personalized profile.
+
+  ## User Profile
+  <interest_profile>
+  {user_interest_description}
+  </interest_profile>
+  1. **Persona Definition:**
+     {persona_definition}
+
+  2. **Negative Constraints:**
+     {negative_constraints}
+
+  3. **Ranking Heuristics:**
+     {ranking_heuristics}
+
+  ## Input Data
+  <documents>
+  {documents_text}
+  </documents>
+
+  ## Detailed Instructions
+  1.  **Analyze the User Profile:**
+      * Understand the user's research identity and focus areas from the Persona Definition
+      * Note the topics to avoid from Negative Constraints
+      * Apply the Ranking Heuristics when evaluating documents
+
+  2.  **Evaluate Each Document (The "Scout" Logic):**
+      * **Direct Alignment:** Does this paper match the user's persona and research interests?
+      * **Constraint Check:** Does this paper violate any negative constraints?
+      * **Heuristic Alignment:** How well does it match the ranking heuristics?
+
+  3.  **Selection Strategy:**
+      * Prioritize papers that strongly align with the user's persona
+      * Exclude papers that match negative constraints
+      * Apply ranking heuristics to break ties
+
+  ## Ranking Logic
+  Rank the top 5 documents according to the user profile. The list must prioritize **personal relevance** to the researcher.
+
+  ## Response Format
+  Return ONLY the document IDs of the 5 most relevant documents, with one document ID per line, enclosed in <Documents></Documents> tags.
+
+  Example response format:
+  <Documents>
+  doc_id_1
+  doc_id_2
+  doc_id_3
+  doc_id_4
+  doc_id_5
+  </Documents>
+
+
+# ============================================================================
+# GEPA-Style Profile Optimization Prompts
+# ============================================================================
+
+# Initial profile extraction from training data (with paper content)
+profile_extraction_prompt: |
+  You are a prompt engineering expert specializing in personalized academic paper recommendations.
+
+  ## Task
+  Analyze the user's reading history to extract a detailed research profile. Your goal is to understand their **core research priorities** based on what captures their limited attention.
+
+  ## Training Data
+  Below are examples from the user's recommendation feed. 
+  For each session, you will see the paper the user EXPLICITLY CLICKED (Positive), alongside other papers that were on the screen at the same time but were NOT CLICKED (Contextual Alternatives).
+
+  {training_examples}
+
+  ## Output Requirements
+  Extract the user's research profile as JSON. Focus on actionable patterns that define their specific niche.
+
+  Output ONLY valid JSON:
+  ```json
+  {{
+    "persona_definition": "2-3 sentences describing the user's core research identity, expertise level, and primary active interests.",
+    "negative_constraints": [
+      "Topics/methods to deprioritize (max 5 items).",
+      "CAUTION: Only add items here if you see a consistent pattern of the user ignoring them. Do not assume 'not clicked' means 'hated'. Frame these as 'Lower priority unless...'"
+    ],
+    "ranking_heuristics": [
+      "Tie-breaking signals that make a paper a 'Must Read' vs 'Maybe Later' (max 5 items).",
+      "Derive these by asking: Why did the user prioritize the clicked paper over the contextual alternatives?"
+    ]
+  }}
+
+# Profile refinement with validation feedback
+profile_refinement_prompt: |
+  You are a prompt engineering expert optimizing a personalized recommendation system.
+
+  ## Current Profile
+  ```json
+  {current_profile}
+  ```
+
+  ## Training Observations
+  {training_examples}
+
+  ## Validation Performance Feedback
+  The current profile achieved:
+  - **Hit@1: {hit_at_1:.1%}** ({hit_count}/{total_val_days} validation days correct)
+  - **Previous iteration Hit@1: {previous_hit_at_1}**
+
+  ### Detailed Performance Breakdown
+  {performance_breakdown}
+
+  ## Your Task
+  Based on the training data AND validation performance, refine the profile to improve Hit@1.
+
+  ### Analysis Questions
+  1. **Success patterns:** On days we got right, what profile aspects helped?
+  2. **Failure patterns:** On days we missed, what did we overlook?
+  3. **Overfitting:** Is the profile too specific to training data?
+  4. **Underfitting:** Are we missing obvious patterns?
+
+  ## Output Requirements
+  Output ONLY valid JSON:
+  ```json
+  {{
+    "persona_definition": "Refined 2-3 sentence description",
+    "negative_constraints": ["Updated list (max 5)"],
+    "ranking_heuristics": ["Updated list (max 5)"],
+    "changes_made": "Brief explanation of key changes",
+    "expected_improvement": "What you expect to improve and why",
+    "confidence": "high/medium/low"
+  }}
+  ```
+
+
+# ============================================================================
+# Validation Prompts (Subset Selection with F1 metric)
+# ============================================================================
+
+# Subset selection: select ALL relevant papers (not just top-5)
+personalized_subset_selection_prompt: |
+  You are a research assistant helping to identify papers most relevant to a user.
+
+  ## User Profile
+  1. **Persona:** {persona_definition}
+  2. **Negative Constraints:** {negative_constraints}
+  3. **Ranking Heuristics:** {ranking_heuristics}
+
+  ## Candidate Papers
+  {documents_text}
+
+  ## Detailed Instructions
+  1.  **Analyze the User Profile:**
+      * Understand the user's research identity and focus areas from the Persona Definition
+      * Note the topics to avoid from Negative Constraints
+      * Apply the Ranking Heuristics when evaluating documents
+
+  2.  **Evaluate Each Document (The "Scout" Logic):**
+      * **Direct Alignment:** Does this paper match the user's persona and research interests?
+      * **Constraint Check:** Does this paper violate any negative constraints?
+      * **Heuristic Alignment:** How well does it match the ranking heuristics?
+
+  3.  **Selection Strategy:**
+      * Prioritize papers that strongly align with the user's persona
+      * Exclude papers that match negative constraints
+      * Apply ranking heuristics to break ties
+
+  ## Response Format
+  Return ONLY the paper IDs of relevant papers, one per line. 
+    You MUST return at least one ID. Do NOT return NONE.
+    <Documents>
+    paper_id_1
+    ...
+    </Documents>
