@@ -1,21 +1,16 @@
+# ruff: noqa: F405
 from bs4 import BeautifulSoup
 from .docset import DocSet, TextChunk, FigureChunk, TableChunk, ChunkType
-from .pdfparser import *
+from .pdfparser import *  # noqa: F403
 from pathlib import Path
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import arxiv
 import os
 import requests
 from urllib.parse import urljoin
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 import json
-import time
 import re
-from typing import List, Tuple
-import base64
-from volcengine.visual.VisualService import VisualService
 from abc import ABC, abstractmethod
 
 class BaseHTMLExtractor(ABC):
@@ -211,7 +206,7 @@ class ArxivHTMLExtractor(BaseHTMLExtractor):
 
                     img_src = img['src']
                     #Get the complete image URL
-                    img_url = urljoin(f"https://arxiv.org/html/{str(arxivid)}/", img_src) 
+                    img_url = urljoin(f"https://arxiv.org/html/{str(arxivid)}/", img_src)  # noqa: F841
                     alt = img.get('alt', '')
                     caption_text = caption.get_text(strip=True)
                     #img_data = requests.get(img_url).content

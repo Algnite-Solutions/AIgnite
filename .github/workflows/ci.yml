@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main, qizhu-dev]
+  pull_request:
+    branches: [main, qizhu-dev]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f pyproject.toml ]; then pip install . ; fi
+          pip install ruff pytest
+
+      - name: Lint with Ruff
+        run: ruff check src/AIgnite/data/ src/AIgnite/recommendation/ src/AIgnite/generation/ test/data/ test/recommendation/ test/generation/
+
+      - name: Test or Syntax Check
+        run: |
+          if [ -d "test" ]; then
+            pytest test/data/ test/recommendation/ test/generation/ -m "not db"
+          else
+            python -m compileall -x '(src/db|src/index)' .
+          fi

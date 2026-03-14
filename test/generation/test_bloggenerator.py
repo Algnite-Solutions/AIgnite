@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import MagicMock, patch
-from AIgnite.generation.generator import GeminiBlogGenerator
+from AIgnite.generation.generator import GeminiBlogGenerator_default as GeminiBlogGenerator
 from AIgnite.data.docset import DocSet, TextChunk
 
 class TestGeminiBlogGenerator(unittest.TestCase):
@@ -13,6 +13,7 @@ class TestGeminiBlogGenerator(unittest.TestCase):
             categories=["cs.AI"],
             published_date="2024-01-01",
             pdf_path="test/data/2501.11216.pdf",  # provide a small dummy PDF file
+            HTML_path="test/data/2501.11216.html",
             text_chunks=[TextChunk(id="t1", type="text", text="This is a test chunk.")],
             figure_chunks=[],
             table_chunks=[],
