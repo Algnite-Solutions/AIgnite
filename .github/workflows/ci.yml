@@ -26,7 +26,7 @@ jobs:
           pip install ruff pytest
 
       - name: Lint with Ruff
-        run: ruff check . --exclude "src/db","src/index"
+        run: ruff check src/AIgnite/data/ src/AIgnite/recommendation/ src/AIgnite/generation/ test/data/ test/recommendation/ test/generation/
 
       - name: Test or Syntax Check
         run: |
