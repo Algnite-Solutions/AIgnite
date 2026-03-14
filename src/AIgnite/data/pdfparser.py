@@ -5,9 +5,8 @@ from pathlib import Path
 import fitz  # PyMuPDF
 import os
 import io
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import arxiv
-import os
 import requests
 from urllib.parse import urljoin
 from requests.adapters import HTTPAdapter
@@ -166,7 +165,7 @@ class ArxivPDFExtractor(BasePDFExtractor):
         Help HTMLExtractor. We don't use it in the process of PDF's extractor
         """
         for doc in self.docs:
-            if doc.HTML_path == None and doc.pdf_path is not None:
+            if doc.HTML_path is None and doc.pdf_path is not None:
                 path = doc.pdf_path
                 print("getting markdown...")
                 markdown_path = get_pdf_md(path,self.pdf_folder_path,doc.doc_id,self.ak,self.sk)
@@ -175,7 +174,7 @@ class ArxivPDFExtractor(BasePDFExtractor):
                     doc.figure_chunks = self.pdf_images_chunk(markdown_path,self.image_folder_path,doc.doc_id)
                     doc.table_chunks = self.pdf_tables_chunk(markdown_path)
                     doc.text_chunks = self.pdf_text_chunk(markdown_path)#一定在最后
-            elif doc.pdf_path == None:
+            elif doc.pdf_path is None:
                 print("Neither PDF or HTML is avaliable.")
                    
     def pdf_images_chunk(self, markdown_path, image_folder_path, doc_id):
@@ -186,7 +185,7 @@ class ArxivPDFExtractor(BasePDFExtractor):
             with open(markdown_path, 'r', encoding='utf-8') as f:
                 md_content = f.read()
                 
-            image_list = _parse_image_urls(md_content, doc_id)
+            image_list = _parse_image_urls(md_content, doc_id) # Original line, no change based on instruction. The snippet in the prompt was malformed.
             if not image_list:
                 print("Warning: No image link was found in Markdown")
                 return figures
@@ -668,7 +667,7 @@ def download_paper(result, save_path: str, filename: str) -> bool:
             print(f"✅ arxiv API下载成功: {filename}")
             return True
         else:
-            print(f"⚠️ arxiv API下载的文件无效，尝试使用可靠下载方法...这可能需要稍微长一点的时间。")
+            print("⚠️ arxiv API下载的文件无效，尝试使用可靠下载方法...这可能需要稍微长一点的时间。")
             if os.path.exists(file_path):
                 os.remove(file_path)
     except Exception as e:
@@ -714,7 +713,7 @@ def get_pdf_md(path,store_path,name,ak,sk):
     visual_service.set_ak(ak)
     visual_service.set_sk(sk)
 
-    params = dict()
+    # params = dict()  # Unused variable
     pdf_content = None
 
     # 使用 with 语句确保文件正确关闭
@@ -722,7 +721,7 @@ def get_pdf_md(path,store_path,name,ak,sk):
         pdf_content = f.read()
         
     if os.path.getsize(path) > 7.5*1024*1024:
-        print(f"📦 PDF 超过 7.5MB，需要压缩。")
+        print("📦 PDF 超过 7.5MB，需要压缩。")
         try:
             compressed_path = compress_pdf(path)
             # compress_pdf在失败时会返回原文件路径，检查是否真的压缩了

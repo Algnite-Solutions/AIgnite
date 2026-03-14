@@ -12,7 +12,7 @@ sys.modules['google'] = MagicMock()
 sys.modules['google.genai'] = MagicMock()
 sys.modules['google.genai.types'] = MagicMock()
 
-from AIgnite.recommendation.LLMReranker import GeminiRerankerPDF
+from AIgnite.recommendation.LLMReranker import GeminiRerankerPDF  # noqa: E402
 
 class TestGeminiRerankerPDF(unittest.TestCase):
     @patch("AIgnite.recommendation.LLMReranker.genai.Client")
@@ -88,7 +88,7 @@ class TestGeminiRerankerPDF(unittest.TestCase):
         pdf_paths_dict = {}
         retrieve_ids = ["doc_1", "doc_2"]
 
-        with patch("AIgnite.recommendation.LLMReranker.extract_first_page_pdf") as mock_extract:
+        with patch("AIgnite.recommendation.LLMReranker.extract_first_page_pdf"):  # noqa: F841
             ranked, thoughts = reranker.rerank(
                 query=query, 
                 pdf_paths_dict=pdf_paths_dict, 
