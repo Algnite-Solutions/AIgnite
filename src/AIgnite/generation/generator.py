@@ -90,8 +90,21 @@ class GeminiBlogGenerator_default(BaseGenerator):
     This class uses the Google Gemini model to generate blog posts based on the provided PDF documents.
     TODO: @Qi, replace data_path and output_path with the actual DB_query and DB_write functions.
     """
-    def __init__(self, model_name="gemini-2.5-flash-lite-preview-09-2025", data_path="./output", output_path="./experiments/output", input_format="pdf"):
-        api_key = os.getenv("GEMINI_API_KEY")
+    def __init__(
+        self,
+        model_name="gemini-2.5-flash-lite-preview-09-2025",
+        data_path="./output",
+        output_path="./experiments/output",
+        input_format="pdf",
+        max_tokens=8192,
+        temperature=0.7,
+        api_key=None,
+        rate_limiter=None,
+        token_tracker=None,
+        username="BlogBot@gmail.com"
+    ):
+        if api_key is None:
+            api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             raise ValueError("GEMINI_API_KEY environment variable is not set")
         self.client = genai.Client(api_key=api_key)
@@ -99,10 +112,14 @@ class GeminiBlogGenerator_default(BaseGenerator):
         self.data_path = data_path
         self.output_path = output_path
         self.input_format = input_format
+        self.max_tokens = max_tokens
+        self.temperature = temperature
+        self.rate_limiter = rate_limiter
+        self.token_tracker = token_tracker
+        self.username = username
 
     def generate_digest(self, papers: List[DocSet], input_format="pdf"):
         import concurrent.futures
-        import threading
         
         def generate_with_delay(paper):
             self._generate_single_blog(paper, input_format)
@@ -140,6 +157,19 @@ class GeminiBlogGenerator_default(BaseGenerator):
         max_retries = 5
         for attempt in range(1, max_retries + 1):
             try:
+                # Apply rate limiting before API call
+                if self.rate_limiter:
+                    try:
+                        self.rate_limiter.acquire()
+                    except Exception as e:
+                        print(f"⚠️ Rate limit error for {arxiv_id}: {e}")
+                        # Wait a bit and retry
+                        if attempt < max_retries:
+                            time.sleep(60)  # Wait 1 minute if rate limited
+                            continue
+                        else:
+                            return
+
                 # Build contents list based on input_format
                 contents = [prompt]
                 if input_format == "pdf":
@@ -149,11 +179,24 @@ class GeminiBlogGenerator_default(BaseGenerator):
                             mime_type='application/pdf',
                         )
                     )
-                
+
                 response = self.client.models.generate_content(
                     model=self.model_name,
                     contents=contents
                 )
+
+                # Track token usage
+                if self.token_tracker and hasattr(response, 'usage_metadata'):
+                    prompt_tokens = response.usage_metadata.prompt_token_count
+                    response_tokens = response.usage_metadata.candidates_token_count
+                    self.token_tracker.track(
+                        username=self.username,
+                        operation="blog_generation",
+                        prompt_tokens=prompt_tokens,
+                        response_tokens=response_tokens
+                    )
+                    print(f"[{self.username}] Blog generation for {arxiv_id} - Tokens: prompt={prompt_tokens}, response={response_tokens}, total={prompt_tokens + response_tokens}")
+
                 break  # 成功就跳出循环
             except Exception as e:
                 print(f"处理论文时出错（第 {attempt} 次尝试）: {e}")
@@ -171,7 +214,6 @@ class GeminiBlogGenerator_default(BaseGenerator):
             md_file.write(response.text)
 
         print(f"✅ Markdown file saved to {markdown_path}")
-        print("📊 Token usage:", response.usage_metadata.prompt_token_count, response.usage_metadata.candidates_token_count)
 
 class GeminiBlogGenerator_recommend(BaseGenerator):
     """
@@ -179,8 +221,21 @@ class GeminiBlogGenerator_recommend(BaseGenerator):
     This class uses the Google Gemini model to generate blog posts based on the provided PDF documents.
     TODO: @Qi, replace data_path and output_path with the actual DB_query and DB_write functions.
     """
-    def __init__(self, model_name="gemini-2.5-flash-preview-09-2025", data_path="./output", output_path="./experiments/output", input_format="pdf"):
-        api_key = os.getenv("GEMINI_API_KEY")
+    def __init__(
+        self,
+        model_name="gemini-2.5-flash-preview-09-2025",
+        data_path="./output",
+        output_path="./experiments/output",
+        input_format="pdf",
+        max_tokens=4096,
+        temperature=0.5,
+        api_key=None,
+        rate_limiter=None,
+        token_tracker=None,
+        username="default"
+    ):
+        if api_key is None:
+            api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             raise ValueError("GEMINI_API_KEY environment variable is not set")
         self.client = genai.Client(api_key=api_key)
@@ -188,10 +243,14 @@ class GeminiBlogGenerator_recommend(BaseGenerator):
         self.data_path = data_path
         self.output_path = output_path
         self.input_format = input_format
+        self.max_tokens = max_tokens
+        self.temperature = temperature
+        self.rate_limiter = rate_limiter
+        self.token_tracker = token_tracker
+        self.username = username
 
     def generate_digest(self, papers: List[DocSet], input_format="pdf"):
         import concurrent.futures
-        import threading
         
         def generate_with_delay(paper):
             self._generate_single_blog(paper, input_format)
@@ -218,7 +277,7 @@ class GeminiBlogGenerator_recommend(BaseGenerator):
         print(f"📄 论文标题: {paper.title[:100]}...")
         print(f"📄 PDF路径: {paper.pdf_path}")
         print(f"📄 输入格式: {input_format}")
-        
+
         # Read and encode the PDF bytes only if input_format is pdf
         if input_format == "pdf":
             with open(paper.pdf_path, "rb") as pdf_file:
@@ -240,6 +299,19 @@ class GeminiBlogGenerator_recommend(BaseGenerator):
         max_retries = 5
         for attempt in range(1, max_retries + 1):
             try:
+                # Apply rate limiting before API call
+                if self.rate_limiter:
+                    try:
+                        self.rate_limiter.acquire()
+                    except Exception as e:
+                        print(f"⚠️ Rate limit error for {arxiv_id}: {e}")
+                        # Wait a bit and retry
+                        if attempt < max_retries:
+                            time.sleep(60)  # Wait 1 minute if rate limited
+                            continue
+                        else:
+                            return
+
                 # Build contents list based on input_format
                 contents = [prompt]
                 if input_format == "pdf":
@@ -249,11 +321,24 @@ class GeminiBlogGenerator_recommend(BaseGenerator):
                             mime_type='application/pdf',
                         )
                     )
-                
+
                 response = self.client.models.generate_content(
                     model=self.model_name,
                     contents=contents
                 )
+
+                # Track token usage
+                if self.token_tracker and hasattr(response, 'usage_metadata'):
+                    prompt_tokens = response.usage_metadata.prompt_token_count
+                    response_tokens = response.usage_metadata.candidates_token_count
+                    self.token_tracker.track(
+                        username=self.username,
+                        operation="recommendation",
+                        prompt_tokens=prompt_tokens,
+                        response_tokens=response_tokens
+                    )
+                    print(f"[{self.username}] Recommendation for {arxiv_id} - Tokens: prompt={prompt_tokens}, response={response_tokens}, total={prompt_tokens + response_tokens}")
+
                 break  # 成功就跳出循环
             except Exception as e:
                 print(f"处理论文时出错（第 {attempt} 次尝试）: {e}")
@@ -271,7 +356,6 @@ class GeminiBlogGenerator_recommend(BaseGenerator):
             md_file.write(response.text)
 
         print(f"✅ Markdown file saved to {markdown_path}")
-        print("📊 Token usage:", response.usage_metadata.prompt_token_count, response.usage_metadata.candidates_token_count)
 
 class AsyncvLLMGenerator:
     def __init__(self, model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-8B", api_base="http://localhost:8000/v1",data_path="./output", output_path="./experiments/output"):
